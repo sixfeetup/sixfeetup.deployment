@@ -1,3 +1,5 @@
+import subprocess
+import re
 import os
 from fabric import local, get
 from fabric import set as fab_set
@@ -10,9 +12,7 @@ TRUISMS = [
     "y",
     "sure"
 ]
-
 YES_OR_NO = ['yes', 'y', 'no', 'n']
-
 PASS_ME = ['none', 'skip', 's']
 
 #SETUPPY_VERSION = r"version.*['"](.*)(?:dev)['"]"
@@ -27,6 +27,13 @@ TAG_HELP_TEXT = """
 Current tags: %(current_tags)s
 Enter a tag name for %(package)s"""
 
+def deploy(diffs=True):
+    """This is the actual command we are going to run
+    """
+    showDiffs()
+    tagPackages()
+    releaseToSkillet()
+
 def raw_default(prompt, default=None):
     if default is not None:
         prompt = "%s [default=%s]: " % (prompt, default)
@@ -40,8 +47,9 @@ def raw_default(prompt, default=None):
 def getPackageList():
     """Compute the list of packages to diff, tag, etc.
     """
+    ignore_dirs = get('package_ignores', [])
     # XXX don't hardcode me
-    ignore_dirs = ['.svn', 'CVS']
+    ignore_dirs = ignore_dirs + ['.svn', 'CVS']
     packages = []
     package_dirs = get('package_dirs')
     # find all the packages in the given package dirs
@@ -69,12 +77,6 @@ def findTagsURL(wc):
     url_parts.remove(base_name)
     base_url = '/'.join(url_parts)
     return svnurl("%s/tags" % base_url)
-
-def deploy(diffs=True):
-    """This is the actual command we are going to run
-    """
-    showDiffs()
-    tagPackages()
 
 def showDiffs():
     """
@@ -145,5 +147,51 @@ def tagPackages():
     fab_set(tagged_packages=tagged)
 
 def releaseToSkillet():
-    # TODO implement me...
-    pass
+    """
+    This most certainly is not fail proof.  be warned!!!
+    """
+    # this could get ugly, quick
+    urls = get('tagged_packages')
+    # make sure and set the environ so that bad things don't
+    # happen with tar on os x
+    os.environ['COPYFILE_DISABLE'] = 'True'
+    co_cmd = "svn co %s %s"
+    
+    # XXX this is assuming that version is set in the setup.py
+    #     and not read from another file
+    version_re = re.compile(r"""(version.*=.*['"])(.*)(['"])""", re.M)
+    
+    # let's do it in tmp
+    os.chdir('/tmp')
+    for url in urls:
+        help_txt = "Do you want to release '%s' to the skillet" % url
+        do_skillet = raw_default(help_txt, "yes")
+        if do_skillet.lower() in TRUISMS:
+            # if the url is an svnurl we need to make it a string
+            url = str(url)
+            # remove a trailing slash
+            if url[-1] == '/':
+                url = url[:-1]
+            parts = url.split('/')
+            # this assumes a tag...
+            version = parts[-1]
+            name = parts[-3]
+            co_name = "%s-%s" % (name, version)
+            # check out the code
+            runme = co_cmd % (url, co_name)
+            subprocess.call(runme.split())
+            os.chdir(co_name)
+            sfname =  "setup.py"
+            sf = open(sfname, 'r')
+            sf_contents = sf.read()
+            sf.close()
+            sf = open(sfname, 'w')
+            sf_new = version_re.sub('\g<1>' + version + '\g<3>', sf_contents)
+            sf.write(sf_new)
+            sf.close()
+            print "committing updated version for %s" % co_name
+            subprocess.call(['svn', 'ci', '-m', '"updating version for release"', '.'])
+            print "uploading new egg for %s to sixie skillet" % co_name
+            runme = "python2.4 setup.py mregister sdist mupload -r skillet"
+            subprocess.call(runme.split())
+            os.chdir('..')

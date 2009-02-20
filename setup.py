@@ -1,7 +1,7 @@
 from setuptools import setup, find_packages
 import os
 
-version = '1.0'
+version = '1.0dev'
 
 setup(name='sixfeetup.deployment',
       version=version,
@@ -22,6 +22,8 @@ setup(name='sixfeetup.deployment',
       install_requires=[
           'setuptools',
           # -*- Extra requirements: -*-
+          'fabric',
+          'py'
       ],
       entry_points="""
       # -*- Entry points: -*-
