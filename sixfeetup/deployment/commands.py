@@ -1,10 +1,9 @@
 import subprocess
 import re
 import os
-from fabric import local, get
-from fabric import set as fab_set
+from fabric import local
 from py.path import svnwc, svnurl
-
+from fabric import ENV as config
 TRUISMS = [
     "true",
     "1",
@@ -47,11 +46,11 @@ def raw_default(prompt, default=None):
 def getPackageList():
     """Compute the list of packages to diff, tag, etc.
     """
-    ignore_dirs = get('package_ignores', [])
+    ignore_dirs = config.package_ignores
     # XXX don't hardcode me
     ignore_dirs = ignore_dirs + ['.svn', 'CVS']
     packages = []
-    package_dirs = get('package_dirs')
+    package_dirs = config.package_dirs
     # find all the packages in the given package dirs
     for package_dir in package_dirs:
         items = os.listdir(package_dir)
@@ -60,7 +59,7 @@ def getPackageList():
                 package_path = '%s/%s' % (package_dir, item)
                 if os.path.isdir(package_path):
                     packages.append(package_path)
-    fab_set(packages=packages)
+    config.packages = packages
 
 def findTagsURL(wc):
     """Find the wcpath/tags/ url so we can tag the package
@@ -83,7 +82,7 @@ def showDiffs():
     """
     to_release = []
     getPackageList()
-    for package in get('packages'):
+    for package in config.packages:
         wc = svnwc(package)
         wc_url = wc.url
         tags_url = findTagsURL(wc)
@@ -106,14 +105,14 @@ def showDiffs():
             # make sure the quesition was answered properly
             if release_package in YES_OR_NO:
                 break
-    fab_set(to_release=to_release)
+    config.to_release = to_release
 
 def tagPackages():
     """
     """
-    print get('to_release')
+    print config.to_release
     tagged = []
-    for package in get('to_release'):
+    for package in config.to_release:
         wc = svnwc(package)
         tags_url = findTagsURL(wc)
         help_txt = "Do you want to tag %s" % package
@@ -144,14 +143,14 @@ def tagPackages():
     # XXX remove this crap later...
     for i in tagged:
         print i
-    fab_set(tagged_packages=tagged)
+    config.tagged_packages = tagged
 
 def releaseToSkillet():
     """
     This most certainly is not fail proof.  be warned!!!
     """
     # this could get ugly, quick
-    urls = get('tagged_packages')
+    urls = config.tagged_packages
     # make sure and set the environ so that bad things don't
     # happen with tar on os x
     os.environ['COPYFILE_DISABLE'] = 'True'
