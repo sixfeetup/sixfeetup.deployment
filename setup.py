@@ -23,7 +23,8 @@ setup(name='sixfeetup.deployment',
           'setuptools',
           # -*- Extra requirements: -*-
           'fabric',
-          'py'
+          'py',
+          'collective.dist'
       ],
       entry_points="""
       # -*- Entry points: -*-
