@@ -191,6 +191,6 @@ def releaseToSkillet():
             print "committing updated version for %s" % co_name
             subprocess.call(['svn', 'ci', '-m', '"updating version for release"', '.'])
             print "uploading new egg for %s to sixie skillet" % co_name
-            runme = "python2.4 setup.py mregister sdist mupload -r skillet"
+            runme = "python setup.py mregister sdist mupload -r skillet"
             subprocess.call(runme.split())
             os.chdir('..')
