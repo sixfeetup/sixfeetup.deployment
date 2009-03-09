@@ -180,17 +180,22 @@ def releaseToSkillet():
             runme = co_cmd % (url, co_name)
             subprocess.call(runme.split())
             os.chdir(co_name)
-            sfname =  "setup.py"
-            sf = open(sfname, 'r')
-            sf_contents = sf.read()
-            sf.close()
-            sf = open(sfname, 'w')
-            sf_new = version_re.sub('\g<1>' + version + '\g<3>', sf_contents)
-            sf.write(sf_new)
-            sf.close()
-            print "committing updated version for %s" % co_name
-            subprocess.call(['svn', 'ci', '-m', '"updating version for release"', '.'])
-            print "uploading new egg for %s to sixie skillet" % co_name
-            runme = "python setup.py mregister sdist mupload -r skillet"
-            subprocess.call(runme.split())
+            if os.path.exists('setup.py'):
+                sfname =  "setup.py"
+                sf = open(sfname, 'r')
+                sf_contents = sf.read()
+                sf.close()
+                sf = open(sfname, 'w')
+                sf_new = version_re.sub('\g<1>' + version + '\g<3>', sf_contents)
+                sf.write(sf_new)
+                sf.close()
+                print "committing updated version for %s" % co_name
+                subprocess.call(['svn', 'ci', '-m', '"updating version for release"', '.'])
+                # XXX make this configurable on a per item basis
+                eggserver = config.get('eggserver', 'skillet')
+                print "uploading new egg for %s to %s" % (co_name, eggserver)
+                runme = "python setup.py mregister sdist mupload -r %s" % eggserver
+                subprocess.call(runme.split())
+            else:
+                print "%s does not have a setup.py" % url
             os.chdir('..')
