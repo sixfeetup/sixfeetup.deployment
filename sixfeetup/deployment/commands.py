@@ -35,9 +35,9 @@ def deploy(diffs=True):
 
 def raw_default(prompt, default=None):
     if default is not None:
-        prompt = "%s [default=%s]: " % (prompt, default)
+        prompt = "%s [%s]: " % (prompt, default)
     else:
-        prompt = "%s:" % prompt
+        prompt = "%s: " % prompt
     res = raw_input(prompt)
     if not res and default is not None:
         return default
