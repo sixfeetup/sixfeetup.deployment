@@ -22,7 +22,7 @@ setup(name='sixfeetup.deployment',
       install_requires=[
           'setuptools',
           # -*- Extra requirements: -*-
-          'fabric',
+          'fabric<=0.1.1',
           'py',
           'collective.dist'
       ],
