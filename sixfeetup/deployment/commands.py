@@ -54,7 +54,7 @@ Check the following URL before continuing:
     confirm("Press return to continue")
 
 
-def raw_default(prompt, default=None):
+def _raw_default(prompt, default=None):
     if default is not None:
         prompt = "%s [%s]: " % (prompt, default)
     else:
@@ -117,13 +117,13 @@ def showDiffs():
             default_tag = 'None'
             if len(current_tags) > 0:
                 default_tag = current_tags[-1]
-            cmp_tag = raw_default(help_txt, default_tag)
+            cmp_tag = _raw_default(help_txt, default_tag)
             if cmp_tag.lower() in PASS_ME or cmp_tag in current_tags:
                 break
         if cmp_tag.lower() not in PASS_ME:
             local('svn diff %(tags_url)s/%(cmp_tag)s %(wc_url)s' % locals())
         while True:
-            release_package = raw_default(
+            release_package = _raw_default(
                 "Does '%s' need a release?" % package, default="no").lower()
             if release_package in TRUISMS:
                 to_release.append(package)
@@ -142,7 +142,7 @@ def tagPackages():
         wc = svnwc(package)
         tags_url = findTagsURL(wc)
         help_txt = "Do you want to tag %s" % package
-        do_tag = raw_default(help_txt, "yes")
+        do_tag = _raw_default(help_txt, "yes")
         if do_tag.lower() in TRUISMS:
             current_tags = map(lambda x: x.basename, tags_url.listdir())
             tag_nums = '0.1'
@@ -161,7 +161,7 @@ def tagPackages():
             except ValueError:
                 default_tag = None
             help_txt = TAG_HELP_TEXT % locals()
-            new_tag = raw_default(help_txt, default_tag)
+            new_tag = _raw_default(help_txt, default_tag)
             new_tag_url = svnurl("%s/%s" % (tags_url.url, new_tag))
             tag_msg = "Tagging %(package)s version %(new_tag)s for release"
             tag_msg = tag_msg % locals()
@@ -192,7 +192,7 @@ def releaseToSkillet():
     os.chdir('/tmp')
     for url in urls:
         help_txt = "Do you want to release '%s' to the skillet" % url
-        do_skillet = raw_default(help_txt, "yes")
+        do_skillet = _raw_default(help_txt, "yes")
         if do_skillet.lower() in TRUISMS:
             # if the url is an svnurl we need to make it a string
             url = str(url)
