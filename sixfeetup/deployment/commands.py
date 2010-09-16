@@ -1,9 +1,8 @@
-import subprocess
 import re
 import os
-from fabric import local
+from fabric.api import env
+from fabric.api import local
 from py.path import svnwc, svnurl
-from fabric import ENV as config
 TRUISMS = [
     "true",
     "1",
@@ -46,11 +45,11 @@ def raw_default(prompt, default=None):
 def getPackageList():
     """Compute the list of packages to diff, tag, etc.
     """
-    ignore_dirs = config.package_ignores
+    ignore_dirs = env.package_ignores
     # XXX don't hardcode me
     ignore_dirs = ignore_dirs + ['.svn', 'CVS']
     packages = []
-    package_dirs = config.package_dirs
+    package_dirs = env.package_dirs
     # find all the packages in the given package dirs
     for package_dir in package_dirs:
         items = os.listdir(package_dir)
@@ -59,11 +58,11 @@ def getPackageList():
                 package_path = '%s/%s' % (package_dir, item)
                 if os.path.isdir(package_path):
                     packages.append(package_path)
-    config.packages = packages
+    env.packages = packages
 
 def findTagsURL(wc):
     """Find the wcpath/tags/ url so we can tag the package
-    
+
     XXX this assumes that we have normal trunk/tags/branches in svn
     """
     url = wc.url.strip('/')
@@ -82,7 +81,7 @@ def showDiffs():
     """
     to_release = []
     getPackageList()
-    for package in config.packages:
+    for package in env.packages:
         wc = svnwc(package)
         wc_url = wc.url
         tags_url = findTagsURL(wc)
@@ -105,14 +104,14 @@ def showDiffs():
             # make sure the quesition was answered properly
             if release_package in YES_OR_NO:
                 break
-    config.to_release = to_release
+    env.to_release = to_release
 
 def tagPackages():
     """
     """
-    print config.to_release
+    print env.to_release
     tagged = []
-    for package in config.to_release:
+    for package in env.to_release:
         wc = svnwc(package)
         tags_url = findTagsURL(wc)
         help_txt = "Do you want to tag %s" % package
@@ -143,23 +142,23 @@ def tagPackages():
     # XXX remove this crap later...
     for i in tagged:
         print i
-    config.tagged_packages = tagged
+    env.tagged_packages = tagged
 
 def releaseToSkillet():
     """
     This most certainly is not fail proof.  be warned!!!
     """
     # this could get ugly, quick
-    urls = config.tagged_packages
+    urls = env.tagged_packages
     # make sure and set the environ so that bad things don't
     # happen with tar on os x
     os.environ['COPYFILE_DISABLE'] = 'True'
     co_cmd = "svn co %s %s"
-    
+
     # XXX this is assuming that version is set in the setup.py
     #     and not read from another file
     version_re = re.compile(r"""(version.*=.*['"])(.*)(['"])""", re.M)
-    
+
     # let's do it in tmp
     os.chdir('/tmp')
     for url in urls:
@@ -177,8 +176,7 @@ def releaseToSkillet():
             name = parts[-3]
             co_name = "%s-%s" % (name, version)
             # check out the code
-            runme = co_cmd % (url, co_name)
-            subprocess.call(runme.split())
+            local(co_cmd % (url, co_name))
             os.chdir(co_name)
             if os.path.exists('setup.py'):
                 sfname =  "setup.py"
@@ -190,12 +188,12 @@ def releaseToSkillet():
                 sf.write(sf_new)
                 sf.close()
                 print "committing updated version for %s" % co_name
-                subprocess.call(['svn', 'ci', '-m', '"updating version for release"', '.'])
+                local('svn ci -m "updating version for release" .')
                 # XXX make this configurable on a per item basis
-                eggserver = config.get('eggserver', 'skillet')
+                eggserver = env.get('eggserver', 'skillet')
                 print "uploading new egg for %s to %s" % (co_name, eggserver)
                 runme = "python setup.py mregister sdist mupload -r %s" % eggserver
-                subprocess.call(runme.split())
+                local(runme)
             else:
                 print "%s does not have a setup.py" % url
             os.chdir('..')
