@@ -11,7 +11,7 @@ TRUISMS = [
     "1",
     "yes",
     "y",
-    "sure"
+    "sure",
 ]
 YES_OR_NO = ['yes', 'y', 'no', 'n']
 PASS_ME = ['none', 'skip', 's']
@@ -30,6 +30,7 @@ TAG_HELP_TEXT = """
 Current tags: %(current_tags)s
 Enter a tag name for %(package)s"""
 
+
 def deploy(diffs=True):
     """This is the actual command we are going to run
     """
@@ -38,6 +39,7 @@ def deploy(diffs=True):
     tagPackages()
     releaseToSkillet()
     _release_manager_warning()
+
 
 def _release_manager_warning():
     print """
@@ -51,6 +53,7 @@ Check the following URL before continuing:
        "query?status=awaiting+release+action")
     confirm("Press return to continue")
 
+
 def raw_default(prompt, default=None):
     if default is not None:
         prompt = "%s [%s]: " % (prompt, default)
@@ -60,6 +63,7 @@ def raw_default(prompt, default=None):
     if not res and default is not None:
         return default
     return res
+
 
 def getPackageList():
     """Compute the list of packages to diff, tag, etc.
@@ -79,6 +83,7 @@ def getPackageList():
                     packages.append(package_path)
     env.packages = packages
 
+
 def findTagsURL(wc):
     """Find the wcpath/tags/ url so we can tag the package
 
@@ -94,6 +99,7 @@ def findTagsURL(wc):
     url_parts.remove(base_name)
     base_url = '/'.join(url_parts)
     return svnurl("%s/tags" % base_url)
+
 
 def showDiffs():
     """
@@ -117,13 +123,15 @@ def showDiffs():
         if cmp_tag.lower() not in PASS_ME:
             local('svn diff %(tags_url)s/%(cmp_tag)s %(wc_url)s' % locals())
         while True:
-            release_package = raw_default("Does '%s' need a release?" % package, default="no").lower()
+            release_package = raw_default(
+                "Does '%s' need a release?" % package, default="no").lower()
             if release_package in TRUISMS:
                 to_release.append(package)
             # make sure the quesition was answered properly
             if release_package in YES_OR_NO:
                 break
     env.to_release = to_release
+
 
 def tagPackages():
     """
@@ -155,13 +163,15 @@ def tagPackages():
             help_txt = TAG_HELP_TEXT % locals()
             new_tag = raw_default(help_txt, default_tag)
             new_tag_url = svnurl("%s/%s" % (tags_url.url, new_tag))
-            tag_msg = "Tagging %(package)s version %(new_tag)s for release" % locals()
+            tag_msg = "Tagging %(package)s version %(new_tag)s for release"
+            tag_msg = tag_msg % locals()
             wc.svnurl().copy(new_tag_url, tag_msg)
             tagged.append(new_tag_url)
     # XXX remove this crap later...
     for i in tagged:
         print i
     env.tagged_packages = tagged
+
 
 def releaseToSkillet():
     """
@@ -198,12 +208,13 @@ def releaseToSkillet():
             local(co_cmd % (url, co_name))
             os.chdir(co_name)
             if os.path.exists('setup.py'):
-                sfname =  "setup.py"
+                sfname = "setup.py"
                 sf = open(sfname, 'r')
                 sf_contents = sf.read()
                 sf.close()
                 sf = open(sfname, 'w')
-                sf_new = version_re.sub('\g<1>' + version + '\g<3>', sf_contents)
+                sf_new = version_re.sub(
+                    '\g<1>' + version + '\g<3>', sf_contents)
                 sf.write(sf_new)
                 sf.close()
                 print "committing updated version for %s" % co_name
@@ -211,8 +222,8 @@ def releaseToSkillet():
                 # XXX make this configurable on a per item basis
                 eggserver = env.get('eggserver', 'skillet')
                 print "uploading new egg for %s to %s" % (co_name, eggserver)
-                runme = "python setup.py mregister sdist mupload -r %s" % eggserver
-                local(runme)
+                runme = "python setup.py mregister sdist mupload -r %s"
+                local(runme % eggserver)
             else:
                 print "%s does not have a setup.py" % url
             os.chdir('..')
