@@ -2,7 +2,10 @@ import re
 import os
 from fabric.api import env
 from fabric.api import local
+from fabric.contrib.console import confirm
+from fabric import colors
 from py.path import svnwc, svnurl
+
 TRUISMS = [
     "true",
     "1",
@@ -16,6 +19,8 @@ PASS_ME = ['none', 'skip', 's']
 #SETUPPY_VERSION = r"version.*['"](.*)(?:dev)['"]"
 #METADATA_VERSION = r"<version>(.*)</version>"
 
+env.trac_url = "https://trac.sixfeetup.com/%s"
+
 DIFF_HELP_TEXT = """
 Current tags: %(current_tags)s
 Select a tag to compare with the current version, you can (s)kip
@@ -28,9 +33,23 @@ Enter a tag name for %(package)s"""
 def deploy(diffs=True):
     """This is the actual command we are going to run
     """
+    _release_manager_warning()
     showDiffs()
     tagPackages()
     releaseToSkillet()
+    _release_manager_warning()
+
+def _release_manager_warning():
+    print """
+%s
+
+Check the following URL before continuing:
+
+%s/%s
+""" % (colors.red("Are there any release manager tickets?", bold=True),
+       env.trac_url % env.project_name,
+       "query?status=awaiting+release+action")
+    confirm("Press return to continue")
 
 def raw_default(prompt, default=None):
     if default is not None:
