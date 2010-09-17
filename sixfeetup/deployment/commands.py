@@ -166,8 +166,8 @@ def choose_packages(show_diff='yes', save_choices='no'):
                 if cmp_tag.lower() in PASS_ME or cmp_tag in current_tags:
                     break
             if cmp_tag.lower() not in PASS_ME:
-                local(
-                    'svn diff %(tags_url)s/%(cmp_tag)s %(wc_url)s' % locals())
+                print local(
+                    'svn diff %(tags_url)s/%(cmp_tag)s %(wc_url)s | colordiff' % locals())
         while True:
             release_package = prompt(
                 "Does '%s' need a release?" % package, default="no").lower()
