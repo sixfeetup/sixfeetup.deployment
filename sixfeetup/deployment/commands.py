@@ -43,11 +43,11 @@ env.package_dirs = ['src']
 env.ignore_dirs = []
 
 
-def deploy(diffs=True):
+def deploy(show_diffs='on'):
     """Start the deployment process for this project
     """
     _release_manager_warning()
-    _show_diffs()
+    choose_packages(show_diffs, save_choices='on')
     release_packages()
     _release_manager_warning()
 
@@ -93,9 +93,8 @@ def _find_tags_url(wc):
     return svnurl("%s/tags" % base_url)
 
 
-def _show_diffs():
-    """
-    """
+def choose_packages(show_diff='yes', save_choices='no'):
+    """Choose the packages that need to be released"""
     to_release = []
     list_package_candidates()
     for package in env.packages:
