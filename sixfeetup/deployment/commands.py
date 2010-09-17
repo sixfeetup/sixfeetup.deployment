@@ -68,6 +68,7 @@ def deploy(show_diffs='on'):
     bump_package_versions()
     update_versions_cfg()
     tag_buildout()
+    _clear_previous_state()
     _release_manager_warning()
 
 
@@ -139,6 +140,11 @@ def _load_previous_state(save_choices):
     elif os.path.exists('.saved_choices'):
         os.unlink('.saved_choices')
     return False
+
+def _clear_previous_state():
+    if not os.path.exists('.saved_choices'):
+        return
+    os.unlink('.saved_choices')
 
 
 def choose_packages(show_diff='yes', save_choices='no'):
