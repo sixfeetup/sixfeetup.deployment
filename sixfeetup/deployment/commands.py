@@ -16,7 +16,6 @@ TRUISMS = [
 YES_OR_NO = ['yes', 'y', 'no', 'n']
 PASS_ME = ['none', 'skip', 's']
 #SETUPPY_VERSION = r"version.*['"](.*)(?:dev)['"]"
-#METADATA_VERSION = r"<version>(.*)</version>"
 DIFF_HELP_TEXT = """
 Current tags: %(current_tags)s
 Select a tag to compare with the current version, you can (s)kip
