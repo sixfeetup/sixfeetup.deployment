@@ -96,6 +96,15 @@ def _find_tags_url(wc):
 def choose_packages(show_diff='yes', save_choices='no'):
     """Choose the packages that need to be released"""
     to_release = []
+    save_choices = save_choices.lower() in TRUISMS
+    if (save_choices and
+      os.path.exists('.saved_choices') and
+      confirm("Do you want to use the previously saved choices?")):
+        with open('.saved_choices') as f:
+            env.to_release = f.read().split('\n')
+        return
+    elif os.path.exists('.saved_choices'):
+        os.unlink('.saved_choices')
     list_package_candidates()
     for package in env.packages:
         wc = svnwc(package)
@@ -122,6 +131,9 @@ def choose_packages(show_diff='yes', save_choices='no'):
             if release_package in YES_OR_NO:
                 break
     env.to_release = to_release
+    if save_choices:
+        with open('.saved_choices', 'w') as f:
+            f.write("\n".join(env.to_release))
 
 
 def release_packages(dev="no"):
