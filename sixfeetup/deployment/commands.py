@@ -227,3 +227,5 @@ def releaseToSkillet():
             else:
                 print "%s does not have a setup.py" % url
             os.chdir('..')
+
+__all__ = ['deploy']
