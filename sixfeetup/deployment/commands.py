@@ -1,6 +1,7 @@
 import os
 import pickle
 import re
+from distutils.version import LooseVersion
 from fabric.api import env
 from fabric.api import local
 from fabric.api import prompt
@@ -158,7 +159,12 @@ def choose_packages(show_diff='yes', save_choices='no'):
         wc_url = wc.url
         if show_diff.lower() in TRUISMS:
             tags_url = _find_tags_url(wc)
-            current_tags = map(lambda x: x.basename, tags_url.listdir())
+            # XXX: kind of silly here...
+            current_tags = map(
+                lambda x: LooseVersion(x.basename),
+                tags_url.listdir())
+            current_tags.sort()
+            current_tags = map(str, current_tags)
             current_tags_string = "No tags created yet"
             if current_tags:
                 current_tags_string = "\n    ".join(current_tags)
