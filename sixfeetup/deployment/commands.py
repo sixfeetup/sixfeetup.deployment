@@ -17,7 +17,7 @@ TRUISMS = [
 GLOBAL_IGNORES = ['.svn', 'CVS', '.AppleDouble', '.git']
 YES_OR_NO = ['yes', 'y', 'no', 'n']
 PASS_ME = ['none', 'skip', 's']
-#SETUPPY_VERSION = r"version.*['"](.*)(?:dev)['"]"
+SETUPPY_VERSION = r"""(version.*=.*['"])(.*)(['"])"""
 DIFF_HELP_TEXT = """
 ----------------------------------------------------------------
 
