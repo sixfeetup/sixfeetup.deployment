@@ -2,6 +2,7 @@ import re
 import os
 from fabric.api import env
 from fabric.api import local
+from fabric.api import prompt
 from fabric.contrib.console import confirm
 from fabric import colors
 from py.path import svnwc, svnurl
@@ -58,17 +59,6 @@ Check the following URL before continuing:
     confirm("Press return to continue")
 
 
-def _raw_default(prompt, default=None):
-    if default is not None:
-        prompt = "%s [%s]: " % (prompt, default)
-    else:
-        prompt = "%s: " % prompt
-    res = raw_input(prompt)
-    if not res and default is not None:
-        return default
-    return res
-
-
 def _package_list():
     """Compute the list of packages to diff, tag, etc.
     """
@@ -121,13 +111,13 @@ def _show_diffs():
             default_tag = 'None'
             if len(current_tags) > 0:
                 default_tag = current_tags[-1]
-            cmp_tag = _raw_default(help_txt, default_tag)
+            cmp_tag = prompt(help_txt, default=default_tag)
             if cmp_tag.lower() in PASS_ME or cmp_tag in current_tags:
                 break
         if cmp_tag.lower() not in PASS_ME:
             local('svn diff %(tags_url)s/%(cmp_tag)s %(wc_url)s' % locals())
         while True:
-            release_package = _raw_default(
+            release_package = prompt(
                 "Does '%s' need a release?" % package, default="no").lower()
             if release_package in TRUISMS:
                 to_release.append(package)
