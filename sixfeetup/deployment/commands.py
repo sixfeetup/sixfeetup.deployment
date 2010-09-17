@@ -12,6 +12,7 @@ TRUISMS = [
     "1",
     "yes",
     "y",
+    "on",
     "sure",
 ]
 YES_OR_NO = ['yes', 'y', 'no', 'n']
