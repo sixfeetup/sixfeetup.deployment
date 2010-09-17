@@ -65,7 +65,7 @@ def _raw_default(prompt, default=None):
     return res
 
 
-def getPackageList():
+def _package_list():
     """Compute the list of packages to diff, tag, etc.
     """
     ignore_dirs = env.package_ignores
@@ -105,7 +105,7 @@ def showDiffs():
     """
     """
     to_release = []
-    getPackageList()
+    _package_list()
     for package in env.packages:
         wc = svnwc(package)
         wc_url = wc.url
