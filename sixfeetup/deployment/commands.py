@@ -1,4 +1,3 @@
-import re
 import os
 from fabric.api import env
 from fabric.api import local
@@ -49,8 +48,7 @@ def deploy(diffs=True):
     """
     _release_manager_warning()
     _show_diffs()
-    _tags_packages()
-    _release_to_package_index()
+    release_packages()
     _release_manager_warning()
 
 
@@ -131,99 +129,16 @@ def _show_diffs():
     env.to_release = to_release
 
 
-def _tags_packages():
-    """
-    """
-    print env.to_release
-    tagged = []
-    for package in env.to_release:
-        wc = svnwc(package)
-        tags_url = _find_tags_url(wc)
-        help_txt = "Do you want to tag %s" % package
-        do_tag = _raw_default(help_txt, "yes")
-        if do_tag.lower() in TRUISMS:
-            current_tags = map(lambda x: x.basename, tags_url.listdir())
-            tag_nums = '0.1'
-            if current_tags:
-                last_tag = current_tags[-1]
-                # XXX we will assume X.X version numbers for now
-                #     with no extra bells and whistles
-                tag_nums = last_tag.split('.')
-            try:
-                next_num = int(tag_nums[1]) + 1
-                if next_num == 10:
-                    next_num = 0
-                    tag_nums[0] = str(int(tag_nums[0]) + 1)
-                tag_nums[1] = str(next_num)
-                default_tag = '.'.join(tag_nums)
-            except ValueError:
-                default_tag = None
-            help_txt = TAG_HELP_TEXT % locals()
-            new_tag = _raw_default(help_txt, default_tag)
-            new_tag_url = svnurl("%s/%s" % (tags_url.url, new_tag))
-            tag_msg = "Tagging %(package)s version %(new_tag)s for release"
-            tag_msg = tag_msg % locals()
-            wc.svnurl().copy(new_tag_url, tag_msg)
-            tagged.append(new_tag_url)
-    # XXX remove this crap later...
-    for i in tagged:
-        print i
-    env.tagged_packages = tagged
-
-
-def _release_to_package_index():
-    """
-    This most certainly is not fail proof.  Be warned!!!
-    """
-    # this could get ugly, quick
-    urls = env.tagged_packages
-    # make sure and set the environ so that bad things don't
-    # happen with tar on os x
-    os.environ['COPYFILE_DISABLE'] = 'True'
-    co_cmd = "svn co %s %s"
-
-    # XXX this is assuming that version is set in the setup.py
-    #     and not read from another file
-    version_re = re.compile(r"""(version.*=.*['"])(.*)(['"])""", re.M)
-
-    # let's do it in tmp
-    os.chdir('/tmp')
-    for url in urls:
-        help_txt = "Do you want to release '%s' to the skillet" % url
-        do_skillet = _raw_default(help_txt, "yes")
-        if do_skillet.lower() in TRUISMS:
-            # if the url is an svnurl we need to make it a string
-            url = str(url)
-            # remove a trailing slash
-            if url[-1] == '/':
-                url = url[:-1]
-            parts = url.split('/')
-            # this assumes a tag...
-            version = parts[-1]
-            name = parts[-3]
-            co_name = "%s-%s" % (name, version)
-            # check out the code
-            local(co_cmd % (url, co_name))
-            os.chdir(co_name)
-            if os.path.exists('setup.py'):
-                sfname = "setup.py"
-                sf = open(sfname, 'r')
-                sf_contents = sf.read()
-                sf.close()
-                sf = open(sfname, 'w')
-                sf_new = version_re.sub(
-                    '\g<1>' + version + '\g<3>', sf_contents)
-                sf.write(sf_new)
-                sf.close()
-                print "committing updated version for %s" % co_name
-                local('svn ci -m "updating version for release" .')
-                # XXX make this configurable on a per item basis
-                eggserver = env.get('eggserver', 'skillet')
-                print "uploading new egg for %s to %s" % (co_name, eggserver)
-                runme = "python setup.py mregister sdist mupload -r %s"
-                local(runme % eggserver)
-            else:
-                print "%s does not have a setup.py" % url
-            os.chdir('..')
-
-__all__ = ['deploy']
+def release_packages(dev="no"):
+    if not env.to_release:
+        print colors.blue("\nNo packages to release.")
+    else:
+        print colors.blue("\nReleasing packages")
+        print "\n".join(env.to_release)
+        print
+    for package_path in env.to_release:
+        cmd = "mkrelease %s -d %s %s"
+        # TODO: handle dev release
+        local(
+            cmd % ("-C", env.default_release_target, package_path),
+            capture=False)

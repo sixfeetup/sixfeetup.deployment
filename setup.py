@@ -24,6 +24,7 @@ setup(name='sixfeetup.deployment',
           # -*- Extra requirements: -*-
           'fabric',
           'py',
+          'jarn.mkrelease',
       ],
       entry_points="""
       # -*- Entry points: -*-
