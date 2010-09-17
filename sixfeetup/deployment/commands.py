@@ -35,7 +35,7 @@ def deploy(diffs=True):
     """Start the deployment process for this project
     """
     _release_manager_warning()
-    showDiffs()
+    _show_diffs()
     tagPackages()
     releaseToSkillet()
     _release_manager_warning()
@@ -101,7 +101,7 @@ def _find_tags_url(wc):
     return svnurl("%s/tags" % base_url)
 
 
-def showDiffs():
+def _show_diffs():
     """
     """
     to_release = []
