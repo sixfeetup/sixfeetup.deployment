@@ -36,7 +36,7 @@ def deploy(diffs=True):
     """
     _release_manager_warning()
     _show_diffs()
-    tagPackages()
+    _tags_packages()
     releaseToSkillet()
     _release_manager_warning()
 
@@ -133,7 +133,7 @@ def _show_diffs():
     env.to_release = to_release
 
 
-def tagPackages():
+def _tags_packages():
     """
     """
     print env.to_release
