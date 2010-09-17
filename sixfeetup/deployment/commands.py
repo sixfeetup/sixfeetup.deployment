@@ -76,6 +76,11 @@ def list_package_candidates(verbose='yes'):
                 package_path = '%s/%s' % (package_dir, item)
                 if os.path.isdir(package_path):
                     env.packages.append(package_path)
+    if verbose.lower() in TRUISMS:
+        print """
+Packages available:
+%s
+""" % "\n".join(env.packages)
 
 
 def _find_tags_url(wc):
