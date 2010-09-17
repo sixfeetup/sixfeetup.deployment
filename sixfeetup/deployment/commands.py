@@ -69,7 +69,7 @@ def _package_list():
     """Compute the list of packages to diff, tag, etc.
     """
     ignore_dirs = env.package_ignores
-    # XXX don't hardcode me
+    # XXX don't hard code me
     ignore_dirs = ignore_dirs + ['.svn', 'CVS']
     packages = []
     package_dirs = env.package_dirs
@@ -127,7 +127,7 @@ def _show_diffs():
                 "Does '%s' need a release?" % package, default="no").lower()
             if release_package in TRUISMS:
                 to_release.append(package)
-            # make sure the quesition was answered properly
+            # make sure the question was answered properly
             if release_package in YES_OR_NO:
                 break
     env.to_release = to_release
@@ -175,7 +175,7 @@ def _tags_packages():
 
 def _release_to_package_index():
     """
-    This most certainly is not fail proof.  be warned!!!
+    This most certainly is not fail proof.  Be warned!!!
     """
     # this could get ugly, quick
     urls = env.tagged_packages
