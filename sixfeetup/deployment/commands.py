@@ -84,7 +84,7 @@ def _package_list():
     env.packages = packages
 
 
-def findTagsURL(wc):
+def _find_tags_url(wc):
     """Find the wcpath/tags/ url so we can tag the package
 
     XXX this assumes that we have normal trunk/tags/branches in svn
@@ -109,7 +109,7 @@ def showDiffs():
     for package in env.packages:
         wc = svnwc(package)
         wc_url = wc.url
-        tags_url = findTagsURL(wc)
+        tags_url = _find_tags_url(wc)
         current_tags = map(lambda x: x.basename, tags_url.listdir())
         cmp_tag = None
         while True:
@@ -140,7 +140,7 @@ def tagPackages():
     tagged = []
     for package in env.to_release:
         wc = svnwc(package)
-        tags_url = findTagsURL(wc)
+        tags_url = _find_tags_url(wc)
         help_txt = "Do you want to tag %s" % package
         do_tag = _raw_default(help_txt, "yes")
         if do_tag.lower() in TRUISMS:
