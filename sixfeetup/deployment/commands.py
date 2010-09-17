@@ -15,6 +15,7 @@ TRUISMS = [
     "on",
     "sure",
 ]
+GLOBAL_IGNORES = ['.svn', 'CVS', '.AppleDouble', '.git']
 YES_OR_NO = ['yes', 'y', 'no', 'n']
 PASS_ME = ['none', 'skip', 's']
 #SETUPPY_VERSION = r"version.*['"](.*)(?:dev)['"]"
@@ -32,8 +33,8 @@ env.trac_url_base = "https://trac.sixfeetup.com"
 env.project_name = ""
 # This is a directory that contains the eggs we want to release
 env.package_dirs = ['src']
-# List of package names to ignore (e.g. 'my.package')
-env.package_ignores = []
+# List of package path names to ignore (e.g. 'my.package')
+env.ignore_dirs = []
 
 
 def deploy(diffs=True):
@@ -63,11 +64,7 @@ Check the following URL before continuing:
 def _package_list():
     """Compute the list of packages to diff, tag, etc.
     """
-    ignore_dirs = env.package_ignores
-    # XXX don't hard code me
-    ignore_dirs = ignore_dirs + ['.svn', 'CVS']
-    packages = []
-    package_dirs = env.package_dirs
+    ignore_dirs = env.ignore_dirs + GLOBAL_IGNORES
     # find all the packages in the given package dirs
     for package_dir in package_dirs:
         items = os.listdir(package_dir)
