@@ -28,9 +28,16 @@ Current tags: %(current_tags)s
 Enter a tag name for %(package)s"""
 
 # URL to the trac instance base
-env.trac_url_base = "https://trac.sixfeetup.com"
+env.trac_url_base = 'https://trac.sixfeetup.com'
 # This is the trac/svn/dist name
 env.project_name = ""
+# List of package paths
+# XXX: this shouldn't have to be paths...
+env.packages = []
+# Default release target. This is a jarn.mkrelease target name
+env.default_release_target = 'public'
+# List of packages to release
+env.to_release = []
 # This is a directory that contains the eggs we want to release
 env.package_dirs = ['src']
 # List of package path names to ignore (e.g. 'my.package')
@@ -66,14 +73,13 @@ def _package_list():
     """
     ignore_dirs = env.ignore_dirs + GLOBAL_IGNORES
     # find all the packages in the given package dirs
-    for package_dir in package_dirs:
+    for package_dir in env.package_dirs:
         items = os.listdir(package_dir)
         for item in items:
             if item not in ignore_dirs:
                 package_path = '%s/%s' % (package_dir, item)
                 if os.path.isdir(package_path):
-                    packages.append(package_path)
-    env.packages = packages
+                    env.packages.append(package_path)
 
 
 def _find_tags_url(wc):
@@ -118,7 +124,7 @@ def _show_diffs():
             release_package = prompt(
                 "Does '%s' need a release?" % package, default="no").lower()
             if release_package in TRUISMS:
-                to_release.append(package)
+                env.to_release.append(package)
             # make sure the question was answered properly
             if release_package in YES_OR_NO:
                 break
