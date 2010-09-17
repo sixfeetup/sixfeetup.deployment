@@ -57,7 +57,6 @@ def _release_manager_warning():
 %s
 
 Check the following URL before continuing:
-
 %s/%s/%s
 """ % (colors.red("Are there any release manager tickets?", bold=True),
        env.trac_url_base,
