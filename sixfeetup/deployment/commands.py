@@ -19,11 +19,17 @@ YES_OR_NO = ['yes', 'y', 'no', 'n']
 PASS_ME = ['none', 'skip', 's']
 #SETUPPY_VERSION = r"version.*['"](.*)(?:dev)['"]"
 DIFF_HELP_TEXT = """
-Current tags: %(current_tags)s
+----------------------------------------------------------------
+
+Current tags:
+    %(current_tags_string)s
 Select a tag to compare with the current version, you can (s)kip
 %(package)s"""
 TAG_HELP_TEXT = """
-Current tags: %(current_tags)s
+----------------------------------------------------------------
+
+Current tags:
+    %(current_tags_string)s
 Enter a tag name for %(package)s"""
 
 # URL to the trac instance base
@@ -116,6 +122,9 @@ def choose_packages(show_diff='yes', save_choices='no'):
         if show_diff.lower() in TRUISMS:
             tags_url = _find_tags_url(wc)
             current_tags = map(lambda x: x.basename, tags_url.listdir())
+            current_tags_string = "No tags created yet"
+            if current_tags:
+                current_tags_string = "\n    ".join(current_tags)
             cmp_tag = None
             while True:
                 help_txt = DIFF_HELP_TEXT % locals()
