@@ -1,5 +1,6 @@
 import os
 import pickle
+import re
 from fabric.api import env
 from fabric.api import local
 from fabric.api import prompt
@@ -42,6 +43,10 @@ env.project_name = ""
 env.packages = []
 # Default release target. This is a jarn.mkrelease target name
 env.default_release_target = 'public'
+# The default path and regex for version number changing
+env.default_version_location = ['setup.py', SETUPPY_VERSION]
+# location of the versions.cfg file
+env.versions_cfg_location = "profiles/versions.cfg"
 # List of packages to release
 env.to_release = []
 # This is a directory that contains the eggs we want to release
@@ -58,6 +63,7 @@ def deploy(show_diffs='on'):
     _release_manager_warning()
     choose_packages(show_diffs, save_choices='on')
     release_packages()
+    bump_package_versions()
     _release_manager_warning()
 
 
@@ -171,15 +177,55 @@ def choose_packages(show_diff='yes', save_choices='no'):
         with open('.saved_choices', 'w') as f:
             pickle.dump(env.package_info, f)
 
+def _next_minor_version(version_string):
+    parts = version_string.split('.')
+    minor = int(parts.pop())
+    parts.append(str(minor + 1))
+    return '.'.join(parts)
 
-def release_packages(dev="no"):
+
+def release_packages(verbose="no", dev="no"):
+    # TODO: check saved choices
     if not env.to_release:
         print colors.yellow("\nNo packages to release.")
         return
     print colors.blue("\nReleasing packages")
     print "\n".join(env.to_release) + "\n"
+    for package in env.to_release:
+        package_info = env.package_info[package]
+        package_path = package_info['path']
+        package_target = package_info.get('target', env.default_release_target)
         cmd = "mkrelease %s -d %s %s"
         # TODO: handle dev release
-        local(
-            cmd % ("-C", env.default_release_target, package_path),
-            capture=False)
+        # TODO: alternate release targets (e.g. private)
+        output = local(
+            cmd % ("-C", package_target, package_path))
+        # XXX: Ewwwwwww
+        package_version = output.split("\n")[0].split(" ")[-1]
+        env.package_info[package]['version'] = package_version
+        env.package_info[package]['next_version'] = _next_minor_version(package_version)
+        if verbose.lower() in TRUISMS:
+            print output
+
+
+def bump_package_versions():
+    for package in env.to_release:
+        package_info = env.package_info[package]
+        next_version = package_info['next_version']
+        version_location = package_info.get(
+            'version_location',
+            env.default_version_location)
+        version_file = "%s/%s" % (package_info['path'], version_location[0])
+        version_re = version_location[1]
+        if os.path.exists(version_file):
+            with open(version_file, 'r') as f:
+                vf_contents = f.read()
+            with open(version_file, 'w') as f:
+                vf_new = re.sub(
+                    version_re,
+                    '\g<1>' + next_version + '\g<3>',
+                    vf_contents,
+                    re.M)
+                f.write(vf_new)
+            cmd = "svn ci -m 'bumping version for next release' %s"
+            local(cmd % version_file)
