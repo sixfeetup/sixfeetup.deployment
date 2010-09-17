@@ -100,7 +100,6 @@ def _find_tags_url(wc):
 
 def choose_packages(show_diff='yes', save_choices='no'):
     """Choose the packages that need to be released"""
-    to_release = []
     save_choices = save_choices.lower() in TRUISMS
     if (save_choices and
       os.path.exists('.saved_choices') and
@@ -114,19 +113,21 @@ def choose_packages(show_diff='yes', save_choices='no'):
     for package in env.packages:
         wc = svnwc(package)
         wc_url = wc.url
-        tags_url = _find_tags_url(wc)
-        current_tags = map(lambda x: x.basename, tags_url.listdir())
-        cmp_tag = None
-        while True:
-            help_txt = DIFF_HELP_TEXT % locals()
-            default_tag = 'None'
-            if len(current_tags) > 0:
-                default_tag = current_tags[-1]
-            cmp_tag = prompt(help_txt, default=default_tag)
-            if cmp_tag.lower() in PASS_ME or cmp_tag in current_tags:
-                break
-        if cmp_tag.lower() not in PASS_ME:
-            local('svn diff %(tags_url)s/%(cmp_tag)s %(wc_url)s' % locals())
+        if show_diff.lower() in TRUISMS:
+            tags_url = _find_tags_url(wc)
+            current_tags = map(lambda x: x.basename, tags_url.listdir())
+            cmp_tag = None
+            while True:
+                help_txt = DIFF_HELP_TEXT % locals()
+                default_tag = 'None'
+                if len(current_tags) > 0:
+                    default_tag = current_tags[-1]
+                cmp_tag = prompt(help_txt, default=default_tag)
+                if cmp_tag.lower() in PASS_ME or cmp_tag in current_tags:
+                    break
+            if cmp_tag.lower() not in PASS_ME:
+                local(
+                    'svn diff %(tags_url)s/%(cmp_tag)s %(wc_url)s' % locals())
         while True:
             release_package = prompt(
                 "Does '%s' need a release?" % package, default="no").lower()
@@ -135,7 +136,6 @@ def choose_packages(show_diff='yes', save_choices='no'):
             # make sure the question was answered properly
             if release_package in YES_OR_NO:
                 break
-    env.to_release = to_release
     if save_choices:
         with open('.saved_choices', 'w') as f:
             f.write("\n".join(env.to_release))
