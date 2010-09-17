@@ -58,6 +58,11 @@ env.package_dirs = ['src']
 env.ignore_dirs = []
 # extra information for a package
 env.package_info = {}
+# QA server host
+env.qa_host = "sfupqaapp01"
+# Base path to instances
+env.base_qa_path = "/var/db/zope/dev"
+#env.base_staging_path = "/var/db/zope/maint"
 
 
 def deploy(show_diffs='on'):
