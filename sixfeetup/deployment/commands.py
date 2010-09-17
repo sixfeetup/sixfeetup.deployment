@@ -174,12 +174,10 @@ def choose_packages(show_diff='yes', save_choices='no'):
 
 def release_packages(dev="no"):
     if not env.to_release:
-        print colors.blue("\nNo packages to release.")
-    else:
-        print colors.blue("\nReleasing packages")
-        print "\n".join(env.to_release)
-        print
-    for package_path in env.to_release:
+        print colors.yellow("\nNo packages to release.")
+        return
+    print colors.blue("\nReleasing packages")
+    print "\n".join(env.to_release) + "\n"
         cmd = "mkrelease %s -d %s %s"
         # TODO: handle dev release
         local(
