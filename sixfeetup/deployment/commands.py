@@ -32,7 +32,7 @@ Enter a tag name for %(package)s"""
 
 
 def deploy(diffs=True):
-    """This is the actual command we are going to run
+    """Start the deployment process for this project
     """
     _release_manager_warning()
     showDiffs()
