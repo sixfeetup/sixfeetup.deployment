@@ -223,6 +223,8 @@ def release_packages(verbose="no", dev="no"):
 
 
 def bump_package_versions():
+    if not env.to_release:
+        return
     print colors.blue("Bumping package versions")
     bumpers = [
         "%s %s" % (package, env.package_info[package]['next_version'])
@@ -252,6 +254,8 @@ def bump_package_versions():
 
 
 def update_versions_cfg():
+    if not env.to_release:
+        return
     print colors.blue("Updating versions.cfg")
     v_cfg = env.versions_cfg_location
     with open(v_cfg) as f:
@@ -270,6 +274,8 @@ def update_versions_cfg():
 
 
 def tag_buildout():
+    if not env.to_release:
+        return
     print colors.blue("Tagging buildout")
     wc = svnwc('.')
     trunk_url = wc.url
