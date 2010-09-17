@@ -4,6 +4,8 @@ import re
 from fabric.api import env
 from fabric.api import local
 from fabric.api import prompt
+from fabric.api import settings
+from fabric.api import abort
 from fabric.contrib.console import confirm
 from fabric import colors
 from py.path import svnwc, svnurl
@@ -64,6 +66,8 @@ def deploy(show_diffs='on'):
     choose_packages(show_diffs, save_choices='on')
     release_packages()
     bump_package_versions()
+    update_versions_cfg()
+    tag_buildout()
     _release_manager_warning()
 
 
@@ -198,8 +202,12 @@ def release_packages(verbose="no", dev="no"):
         cmd = "mkrelease %s -d %s %s"
         # TODO: handle dev release
         # TODO: alternate release targets (e.g. private)
-        output = local(
-            cmd % ("-C", package_target, package_path))
+        with settings(warn_only=True):
+            output = local(
+                cmd % ("-C", package_target, package_path))
+        if output.failed:
+            print output
+            abort("Something went wrong, probably a version mismatch")
         # XXX: Ewwwwwww
         package_version = output.split("\n")[0].split(" ")[-1]
         env.package_info[package]['version'] = package_version
@@ -209,6 +217,12 @@ def release_packages(verbose="no", dev="no"):
 
 
 def bump_package_versions():
+    print colors.blue("Bumping package versions")
+    bumpers = [
+        "%s %s" % (package, env.package_info[package]['next_version'])
+        for package in env.package_info
+        if env.package_info[package].get('release', False)]
+    print "\n".join(bumpers)
     for package in env.to_release:
         package_info = env.package_info[package]
         next_version = package_info['next_version']
@@ -232,12 +246,34 @@ def bump_package_versions():
 
 
 def update_versions_cfg():
-    pass
+    print colors.blue("Updating versions.cfg")
+    v_cfg = env.versions_cfg_location
+    with open(v_cfg) as f:
+        vcfg_content = f.read()
+    # TODO: handle initial build when there are no versions present
+    with open(v_cfg, 'w') as f:
+        for package in env.to_release:
+            package_info = env.package_info[package]
+            vcfg_content = re.sub(
+                "%s.*" % package,
+                "%s = %s" % (package, package_info['next_version']),
+                vcfg_content,
+                re.M)
+        f.write(vcfg_content)
+    local("svn ci -m 'updating versions for release' %s" % v_cfg)
 
 
 def tag_buildout():
-    pass
-
-
-def bump_buildout_version():
-    pass
+    print colors.blue("Tagging buildout")
+    wc = svnwc('.')
+    trunk_url = wc.url
+    base_dir = wc.svnurl().dirpath().url
+    with open('version.txt') as f:
+        version = f.read().strip()
+    local("svn cp -m 'tagging for release' %s %s/tags/%s" % (
+        trunk_url, base_dir, version))
+    # now bump the version and commit
+    with open('version.txt', 'w') as f:
+        new_version = _next_minor_version(version)
+        f.write(new_version)
+    local("svn ci -m 'bumping version for next release' version.txt")
