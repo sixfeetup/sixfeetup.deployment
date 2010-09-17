@@ -65,9 +65,8 @@ Check the following URL before continuing:
     prompt("Press return to continue")
 
 
-def _package_list():
-    """Compute the list of packages to diff, tag, etc.
-    """
+def list_package_candidates(verbose='yes'):
+    """List the packages that are available for deployment"""
     ignore_dirs = env.ignore_dirs + GLOBAL_IGNORES
     # find all the packages in the given package dirs
     for package_dir in env.package_dirs:
@@ -98,7 +97,7 @@ def _show_diffs():
     """
     """
     to_release = []
-    _package_list()
+    list_package_candidates()
     for package in env.packages:
         wc = svnwc(package)
         wc_url = wc.url
