@@ -229,3 +229,15 @@ def bump_package_versions():
                 f.write(vf_new)
             cmd = "svn ci -m 'bumping version for next release' %s"
             local(cmd % version_file)
+
+
+def update_versions_cfg():
+    pass
+
+
+def tag_buildout():
+    pass
+
+
+def bump_buildout_version():
+    pass
