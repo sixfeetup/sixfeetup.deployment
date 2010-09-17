@@ -15,20 +15,24 @@ TRUISMS = [
 ]
 YES_OR_NO = ['yes', 'y', 'no', 'n']
 PASS_ME = ['none', 'skip', 's']
-
 #SETUPPY_VERSION = r"version.*['"](.*)(?:dev)['"]"
 #METADATA_VERSION = r"<version>(.*)</version>"
-
-env.trac_url = "https://trac.sixfeetup.com/%s"
-
 DIFF_HELP_TEXT = """
 Current tags: %(current_tags)s
 Select a tag to compare with the current version, you can (s)kip
 %(package)s"""
-
 TAG_HELP_TEXT = """
 Current tags: %(current_tags)s
 Enter a tag name for %(package)s"""
+
+# URL to the trac instance base
+env.trac_url_base = "https://trac.sixfeetup.com"
+# This is the trac/svn/dist name
+env.project_name = ""
+# This is a directory that contains the eggs we want to release
+env.package_dirs = ['src']
+# List of package names to ignore (e.g. 'my.package')
+env.package_ignores = []
 
 
 def deploy(diffs=True):
@@ -47,9 +51,10 @@ def _release_manager_warning():
 
 Check the following URL before continuing:
 
-%s/%s
+%s/%s/%s
 """ % (colors.red("Are there any release manager tickets?", bold=True),
-       env.trac_url % env.project_name,
+       env.trac_url_base,
+       env.project_name,
        "query?status=awaiting+release+action")
     confirm("Press return to continue")
 
