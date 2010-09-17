@@ -1,4 +1,5 @@
 import os
+import pickle
 from fabric.api import env
 from fabric.api import local
 from fabric.api import prompt
@@ -47,6 +48,8 @@ env.to_release = []
 env.package_dirs = ['src']
 # List of package path names to ignore (e.g. 'my.package')
 env.ignore_dirs = []
+# extra information for a package
+env.package_info = {}
 
 
 def deploy(show_diffs='on'):
@@ -81,7 +84,13 @@ def list_package_candidates(verbose='yes'):
             if item not in ignore_dirs:
                 package_path = '%s/%s' % (package_dir, item)
                 if os.path.isdir(package_path):
-                    env.packages.append(package_path)
+                    # XXX: we will assume the last path is the package name
+                    # TODO: read this in from the setup.py
+                    package_name = package_path.split('/')[-1]
+                    if not package_name in env.package_info:
+                        env.package_info[package_name] = {}
+                    env.package_info[package_name]['path'] = package_path
+                    env.packages.append(package_name)
     if verbose.lower() in TRUISMS:
         print """
 Packages available:
@@ -104,20 +113,32 @@ def _find_tags_url(wc):
     return svnurl("%s/tags" % base_url)
 
 
-def choose_packages(show_diff='yes', save_choices='no'):
-    """Choose the packages that need to be released"""
-    save_choices = save_choices.lower() in TRUISMS
+def _load_previous_state(save_choices):
+    """Get state info from the saved pickle
+    """
     if (save_choices and
       os.path.exists('.saved_choices') and
       confirm("Do you want to use the previously saved choices?")):
         with open('.saved_choices') as f:
-            env.to_release = f.read().split('\n')
-        return
+            env.package_info = pickle.load(f)
+            env.to_release = [
+                package
+                for package in env.package_info
+                if env.package_info[package].get('release', False)]
+        return True
     elif os.path.exists('.saved_choices'):
         os.unlink('.saved_choices')
+    return False
+
+
+def choose_packages(show_diff='yes', save_choices='no'):
+    """Choose the packages that need to be released"""
+    save_choices = save_choices.lower() in TRUISMS
+    if _load_previous_state(save_choices):
+        return
     list_package_candidates()
     for package in env.packages:
-        wc = svnwc(package)
+        wc = svnwc(env.package_info[package]['path'])
         wc_url = wc.url
         if show_diff.lower() in TRUISMS:
             tags_url = _find_tags_url(wc)
@@ -141,13 +162,14 @@ def choose_packages(show_diff='yes', save_choices='no'):
             release_package = prompt(
                 "Does '%s' need a release?" % package, default="no").lower()
             if release_package in TRUISMS:
+                env.package_info[package]['release'] = True
                 env.to_release.append(package)
             # make sure the question was answered properly
             if release_package in YES_OR_NO:
                 break
     if save_choices:
         with open('.saved_choices', 'w') as f:
-            f.write("\n".join(env.to_release))
+            pickle.dump(env.package_info, f)
 
 
 def release_packages(dev="no"):
