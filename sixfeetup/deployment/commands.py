@@ -37,7 +37,7 @@ def deploy(diffs=True):
     _release_manager_warning()
     _show_diffs()
     _tags_packages()
-    releaseToSkillet()
+    _release_to_package_index()
     _release_manager_warning()
 
 
@@ -173,7 +173,7 @@ def _tags_packages():
     env.tagged_packages = tagged
 
 
-def releaseToSkillet():
+def _release_to_package_index():
     """
     This most certainly is not fail proof.  be warned!!!
     """
