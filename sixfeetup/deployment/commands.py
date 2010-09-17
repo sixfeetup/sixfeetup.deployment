@@ -56,7 +56,7 @@ Check the following URL before continuing:
        env.trac_url_base,
        env.project_name,
        "query?status=awaiting+release+action")
-    confirm("Press return to continue")
+    prompt("Press return to continue")
 
 
 def _package_list():
