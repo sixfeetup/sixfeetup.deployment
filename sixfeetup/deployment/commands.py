@@ -82,14 +82,12 @@ def _package_list():
 
 def _find_tags_url(wc):
     """Find the wcpath/tags/ url so we can tag the package
-
-    XXX this assumes that we have normal trunk/tags/branches in svn
     """
     url = wc.url.strip('/')
     url_parts = url.split('/')
     base_name = wc.svnurl().basename
     if base_name != 'trunk':
-        # XXX this is a bit presumptious
+        # XXX this is a bit presumptuous
         # remove the branches or tags
         del url_parts[-2]
     url_parts.remove(base_name)
