@@ -277,7 +277,7 @@ def update_versions_cfg():
             package_info = env.package_info[package]
             vcfg_content = re.sub(
                 "%s.*" % package,
-                "%s = %s" % (package, package_info['next_version']),
+                "%s = %s" % (package, package_info['version']),
                 vcfg_content,
                 re.M)
         f.write(vcfg_content)
