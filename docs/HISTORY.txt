@@ -1,6 +1,15 @@
 Changelog
 =========
 
+1.9 (xxxx-xx-xx)
+----------------
+
+- Fixed script so that versions.cfg is updated with missing versions
+  [clayton]
+
+- Warn when multiple pins exist
+  [clayton]
+
 1.0 - Unreleased
 ----------------
 

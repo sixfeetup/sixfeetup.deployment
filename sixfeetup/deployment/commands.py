@@ -265,22 +265,42 @@ def bump_package_versions():
 
 
 def update_versions_cfg():
+    """Update the versions.cfg with the packages that have changed
+    """
     if not env.to_release:
         return
     print colors.blue("Updating versions.cfg")
+    # get the version file contents
     v_cfg = env.versions_cfg_location
     with open(v_cfg) as f:
         vcfg_content = f.read()
-    # TODO: handle initial build when there are no versions present
+    missing_versions = []
+    # loop through the packages and update the versions
     with open(v_cfg, 'w') as f:
         for package in env.to_release:
             package_info = env.package_info[package]
-            vcfg_content = re.sub(
-                "%s.*" % package,
-                "%s = %s" % (package, package_info['version']),
-                vcfg_content,
-                re.M)
+            package_version = package_info['version']
+            package_re = "%s.*" % package
+            version_pins = re.findall(package_re, vcfg_content)
+            if not version_pins:
+                print colors.red(
+                    '%s was not in versions.cfg. It was added.' % package)
+                missing_versions.append('%s = %s' % (package, package_version))
+            else:
+                if len(version_pins) > 1:
+                    print colors.red(
+                        "WARNING: There were multiple pins for %s" % package)
+                vcfg_content = re.sub(
+                    package_re,
+                    "%s = %s" % (package, package_version),
+                    vcfg_content,
+                    re.M)
         f.write(vcfg_content)
+    # add any missing version definitions to the config file
+    if missing_versions:
+        with open(v_cfg, 'a') as f:
+            for missing in missing_versions:
+                f.write("%s\n" % missing)
     local("svn ci -m 'updating versions for release' %s" % v_cfg)
 
 
