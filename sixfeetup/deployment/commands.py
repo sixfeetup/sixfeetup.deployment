@@ -70,8 +70,8 @@ def deploy(show_diffs='on'):
     """Start the deployment process for this project
     """
     _release_manager_warning()
-    choose_packages(show_diffs, save_choices='on')
-    release_packages()
+    choose_packages(show_diffs, save_choices='yes')
+    release_packages(save_choices='yes')
     bump_package_versions()
     update_versions_cfg()
     tag_buildout()
@@ -207,8 +207,8 @@ def _next_minor_version(version_string):
     return '.'.join(parts)
 
 
-def release_packages(verbose="no", dev="no"):
-    # TODO: check saved choices
+def release_packages(verbose="no", dev="no", save_choices='no'):
+    save_choices = save_choices.lower() in TRUISMS
     if not env.to_release:
         print colors.yellow("\nNo packages to release.")
         return
@@ -216,6 +216,15 @@ def release_packages(verbose="no", dev="no"):
     print "\n".join(env.to_release) + "\n"
     for package in env.to_release:
         package_info = env.package_info[package]
+        # first check to see if this version of the package was already released
+        current_release =  package_info.get('released_version', None)
+        with cd(package_info['path']):
+            current_version = local("python setup.py --version")
+        if current_release is not None and current_release == current_version:
+            msg = "%s version %s has already been released"
+            print colors.red(msg % (package, current_version))
+            # since it was already release, just move on to the next package
+            continue
         package_path = package_info['path']
         package_target = package_info.get('target', env.default_release_target)
         cmd = "mkrelease %s -d %s %s"
@@ -236,6 +245,10 @@ def release_packages(verbose="no", dev="no"):
             abort("Could not find package version from mkrelease output")
         env.package_info[package]['version'] = package_version
         env.package_info[package]['next_version'] = _next_minor_version(package_version)
+        env.package_info[package]['released_version'] = package_version
+        if save_choices:
+            with open('.saved_choices', 'w') as f:
+                pickle.dump(env.package_info, f)
         if verbose.lower() in TRUISMS:
             print output
 
