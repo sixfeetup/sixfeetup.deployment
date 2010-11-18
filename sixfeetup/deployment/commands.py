@@ -147,6 +147,7 @@ def _load_previous_state(save_choices):
         os.unlink('.saved_choices')
     return False
 
+
 def _clear_previous_state():
     if not os.path.exists('.saved_choices'):
         return
@@ -183,8 +184,8 @@ def choose_packages(show_diff='yes', save_choices='no'):
                 if cmp_tag.lower() in PASS_ME or cmp_tag in current_tags:
                     break
             if cmp_tag.lower() not in PASS_ME:
-                print local(
-                    'svn diff %(tags_url)s/%(cmp_tag)s %(wc_url)s | colordiff' % locals())
+                cmd = 'svn diff %(tags_url)s/%(cmp_tag)s %(wc_url)s |colordiff'
+                print local(cmd % locals())
         while True:
             release_package = prompt(
                 "Does '%s' need a release?" % package, default="no").lower()
@@ -225,8 +226,13 @@ def release_packages(verbose="no", dev="no"):
         if output.failed:
             print output
             abort("Something went wrong, probably a version mismatch")
-        # XXX: Ewwwwwww
-        package_version = output.split("\n")[0].split(" ")[-1]
+        # search through the mkrelease output to find the version number
+        tag_output = re.search('Tagging %s (.*)' % package, output)
+        if tag_output is not None and len(tag_output.groups()):
+            package_version = tag_output.groups()[0]
+        else:
+            print output
+            abort("Could not find package version from mkrelease output")
         env.package_info[package]['version'] = package_version
         env.package_info[package]['next_version'] = _next_minor_version(package_version)
         if verbose.lower() in TRUISMS:
