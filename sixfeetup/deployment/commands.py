@@ -7,6 +7,7 @@ from fabric.api import local
 from fabric.api import prompt
 from fabric.api import settings
 from fabric.api import abort
+from fabric.api import cd
 from fabric.contrib.console import confirm
 from fabric import colors
 from py.path import svnwc, svnurl
@@ -101,9 +102,9 @@ def list_package_candidates(verbose='yes'):
             if item not in ignore_dirs:
                 package_path = '%s/%s' % (package_dir, item)
                 if os.path.isdir(package_path):
-                    # XXX: we will assume the last path is the package name
-                    # TODO: read this in from the setup.py
-                    package_name = package_path.split('/')[-1]
+                    with cd(package_path):
+                        # get the actual package name from the setup.py
+                        package_name = local("python setup.py --name")
                     if not package_name in env.package_info:
                         env.package_info[package_name] = {}
                     env.package_info[package_name]['path'] = package_path
