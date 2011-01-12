@@ -10,6 +10,8 @@ from fabric.api import settings
 from fabric.api import abort
 from fabric.api import cd
 from fabric.api import hosts
+from fabric.api import hide
+from fabric.api import get
 from fabric.contrib.console import confirm
 from fabric import colors
 import py.path
@@ -42,7 +44,7 @@ Enter a tag name for %(package)s"""
 
 # URL to the trac instance base
 env.trac_url_base = 'https://trac.sixfeetup.com'
-# This is the trac/svn/dist name
+# This is the trac/svn/dist/extranet name
 env.project_name = ""
 # List of package paths
 # XXX: this shouldn't have to be paths...
@@ -68,6 +70,11 @@ env.staging_hosts = ["sfupstaging01"]
 # Base path to instances
 env.base_qa_path = "/var/db/zope/dev"
 #env.base_staging_path = "/var/db/zope/maint"
+# Data server host
+env.data_hosts = ['extranet']
+# Data base path
+env.base_data_path = '/usr/local/www/data'
+env.full_data_path = ''
 
 
 def deploy(deploy_env='qa', show_diffs='on'):
@@ -380,3 +387,26 @@ def _release_to_env(deploy_tag=""):
     # run buildout
     # start instance
     pass
+
+
+def _get_data_path():
+    if env.full_data_path:
+        full_path = env.full_data_path
+    else:
+        full_path = os.path.join(env.base_data_path, env.project_name, 'data')
+    return full_path
+
+
+@hosts(env.data_hosts)
+def list_saved_data():
+    with settings(hide('warnings', 'running', 'stdout', 'stderr'),
+                  warn_only=True):
+        full_path = _get_data_path()
+        with cd(full_path):
+            print '%s: "%s"' % (env.host_string, full_path)
+            print run('ls %s' % '*.tgz')
+
+
+@hosts(env.data_hosts)
+def get_saved_data(fname):
+    get(os.path.join(_get_data_path(), fname), fname)
