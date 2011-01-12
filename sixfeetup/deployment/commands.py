@@ -1,7 +1,7 @@
 import os
 import pickle
 import re
-from distutils.version import LooseVersion
+import distutils.version
 from fabric.api import env
 from fabric.api import local
 from fabric.api import prompt
@@ -10,7 +10,7 @@ from fabric.api import abort
 from fabric.api import cd
 from fabric.contrib.console import confirm
 from fabric import colors
-from py.path import svnwc, svnurl
+import py.path
 
 TRUISMS = [
     "true",
@@ -128,7 +128,7 @@ def _find_tags_url(wc):
         del url_parts[-2]
     url_parts.remove(base_name)
     base_url = '/'.join(url_parts)
-    return svnurl("%s/tags" % base_url)
+    return py.path.svnurl("%s/tags" % base_url)
 
 
 def _load_previous_state(save_choices):
@@ -162,13 +162,13 @@ def choose_packages(show_diff='yes', save_choices='no'):
         return
     list_package_candidates()
     for package in env.packages:
-        wc = svnwc(env.package_info[package]['path'])
+        wc = py.path.svnwc(env.package_info[package]['path'])
         wc_url = wc.url
         if show_diff.lower() in TRUISMS:
             tags_url = _find_tags_url(wc)
             # XXX: kind of silly here...
             current_tags = map(
-                lambda x: LooseVersion(x.basename),
+                lambda x: distutils.version.LooseVersion(x.basename),
                 tags_url.listdir())
             current_tags.sort()
             current_tags = map(str, current_tags)
@@ -331,7 +331,7 @@ def tag_buildout():
     if not env.to_release:
         return
     print colors.blue("Tagging buildout")
-    wc = svnwc('.')
+    wc = py.path.svnwc('.')
     trunk_url = wc.url
     base_dir = wc.svnurl().dirpath().url
     with open('version.txt') as f:
