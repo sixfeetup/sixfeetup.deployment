@@ -67,6 +67,7 @@ env.valid_deploy_envs = ['qa', 'staging', 'prod']
 # QA server host
 env.qa_hosts = ["sfupqaapp01"]
 env.staging_hosts = ["sfupstaging01"]
+env.prod_hosts = []
 # Base path to instances
 env.base_qa_path = "/var/db/zope/dev"
 #env.base_staging_path = "/var/db/zope/maint"
@@ -399,14 +400,18 @@ def _get_data_path():
 
 @hosts(env.data_hosts)
 def list_saved_data():
+    """List saved data files from the data server
+    """
     with settings(hide('warnings', 'running', 'stdout', 'stderr'),
                   warn_only=True):
         full_path = _get_data_path()
         with cd(full_path):
             print '%s: "%s"' % (env.host_string, full_path)
-            print run('ls %s' % '*.tgz')
+            print run('ls *.tgz')
 
 
 @hosts(env.data_hosts)
 def get_saved_data(fname):
+    """Retrieve saved data files from the data server
+    """
     get(os.path.join(_get_data_path(), fname), fname)
