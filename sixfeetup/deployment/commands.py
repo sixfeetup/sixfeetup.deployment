@@ -200,6 +200,7 @@ def choose_packages(show_diff='yes', save_choices='no'):
         with open('.saved_choices', 'w') as f:
             pickle.dump(env.package_info, f)
 
+
 def _next_minor_version(version_string):
     parts = version_string.split('.')
     minor = int(parts.pop())
@@ -216,8 +217,9 @@ def release_packages(verbose="no", dev="no", save_choices='no'):
     print "\n".join(env.to_release) + "\n"
     for package in env.to_release:
         package_info = env.package_info[package]
-        # first check to see if this version of the package was already released
-        current_release =  package_info.get('released_version', None)
+        # first check to see if this version of the package was already
+        # released
+        current_release = package_info.get('released_version', None)
         with cd(package_info['path']):
             current_version = local("python setup.py --version")
         if current_release is not None and current_release == current_version:
@@ -244,7 +246,8 @@ def release_packages(verbose="no", dev="no", save_choices='no'):
             print output
             abort("Could not find package version from mkrelease output")
         env.package_info[package]['version'] = package_version
-        env.package_info[package]['next_version'] = _next_minor_version(package_version)
+        env.package_info[package]['next_version'] = _next_minor_version(
+            package_version)
         env.package_info[package]['released_version'] = package_version
         if save_choices:
             with open('.saved_choices', 'w') as f:
