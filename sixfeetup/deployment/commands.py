@@ -4,10 +4,12 @@ import re
 import distutils.version
 from fabric.api import env
 from fabric.api import local
+from fabric.api import run
 from fabric.api import prompt
 from fabric.api import settings
 from fabric.api import abort
 from fabric.api import cd
+from fabric.api import hosts
 from fabric.contrib.console import confirm
 from fabric import colors
 import py.path
@@ -59,22 +61,28 @@ env.package_dirs = ['src']
 env.ignore_dirs = []
 # extra information for a package
 env.package_info = {}
+env.valid_deploy_envs = ['qa', 'staging', 'prod']
 # QA server host
-env.qa_host = "sfupqaapp01"
+env.qa_hosts = ["sfupqaapp01"]
+env.staging_hosts = ["sfupstaging01"]
 # Base path to instances
 env.base_qa_path = "/var/db/zope/dev"
 #env.base_staging_path = "/var/db/zope/maint"
 
 
-def deploy(show_diffs='on'):
+def deploy(deploy_env='qa', show_diffs='on'):
     """Start the deployment process for this project
     """
     _release_manager_warning()
-    choose_packages(show_diffs, save_choices='yes')
-    release_packages(save_choices='yes')
-    bump_package_versions()
-    update_versions_cfg()
-    tag_buildout()
+    if deploy_env == 'qa':
+        choose_packages(show_diffs, save_choices='yes')
+        release_packages(save_choices='yes')
+        bump_package_versions()
+        update_versions_cfg()
+        tag_buildout()
+        release_qa()
+    else:
+        eval("release_%s()" % deploy_env)
     _clear_previous_state()
     _release_manager_warning()
 
@@ -342,4 +350,33 @@ def tag_buildout():
     with open('version.txt', 'w') as f:
         new_version = _next_minor_version(version)
         f.write(new_version)
+    env.deploy_tag = version
     local("svn ci -m 'bumping version for next release' version.txt")
+
+
+def _get_deploy_env():
+    """Get the deploy env from the user
+    """
+    while True:
+        deploy_env = prompt("What envrionment are you deploying to?").lower()
+        if deploy_env in env.valid_deploy_envs:
+            return deploy_env
+
+
+@hosts(env.qa_hosts)
+def release_qa():
+    _release_to_env()
+
+
+def _release_to_env(deploy_tag=""):
+    """Release to a particular environment
+    """
+    if not deploy_tag:
+        deploy_tag = prompt("What tag are you deploying?")
+    print run('ls')
+    # stop instance
+    # switch to the new tag
+    #   check for errors?
+    # run buildout
+    # start instance
+    pass
