@@ -281,7 +281,7 @@ def release_packages(verbose="no", dev="no", save_choices='no'):
                 cmd % ("-C", package_target, package_path))
         if output.failed:
             print output
-            abort("Something went wrong, probably a version mismatch")
+            abort(output.stderr)
         # search through the mkrelease output to find the version number
         tag_output = re.search('Tagging %s (.*)' % package, output)
         if tag_output is not None and len(tag_output.groups()):
