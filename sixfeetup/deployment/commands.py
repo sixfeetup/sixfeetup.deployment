@@ -445,6 +445,7 @@ def _release_to_env():
         # TODO: add to supervisor configs
         #with cd(base_path):
         #    run("svn co %s %s" % (tag_url, buildout_name))
+        #    # TODO: make sure project is chowned and chmoded properly
         #with cd(buildout_dir):
         #    run("python%s bootstrap.py %s" % (
         #        env.python_version,
@@ -458,9 +459,10 @@ def _release_to_env():
     run("supervisorctl stop %s" % supervisor_processes)
     # TODO: get the data from prod/staging here
     with cd(buildout_dir):
+        # TODO: Check for changes in the buildout
         # switch to the new tag
         run("svn switch %s" % tag_url)
-        # XXX: check for issues with switch
+        # TODO: check for issues with switch
         # run buildout
         run("bin/buildout -v")
     # start instance
