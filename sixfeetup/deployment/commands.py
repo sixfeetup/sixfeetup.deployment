@@ -1,20 +1,25 @@
 import os
 import pickle
 import re
+
+from datetime import date
+
 import distutils.version
-from fabric.api import env
-from fabric.api import local
-from fabric.api import run
-from fabric.api import prompt
-from fabric.api import settings
+
+from fabric import colors
 from fabric.api import abort
 from fabric.api import cd
-from fabric.api import hosts
-from fabric.api import hide
+from fabric.api import env
 from fabric.api import get
+from fabric.api import hide
+from fabric.api import local
+from fabric.api import prompt
+from fabric.api import puts
+from fabric.api import run
+from fabric.api import settings
 from fabric.contrib.console import confirm
 from fabric.contrib.files import exists
-from fabric import colors
+
 import py.path
 
 TRUISMS = [
@@ -42,6 +47,14 @@ TAG_HELP_TEXT = """
 Current tags:
     %(current_tags_string)s
 Enter a tag name for %(package)s"""
+DATA_HELP_TEXT = """
+----------------------------------------------------------------
+
+Current saved data files:
+
+%(current_data_string)s
+
+Enter a file name to %(saved_data_action)s:"""
 
 # URL to the trac instance base
 env.trac_url_base = 'https://trac.sixfeetup.com'
@@ -88,6 +101,9 @@ env.prod_buildout_name = ""
 # tag number
 env.deploy_tag = ""
 
+env.roledefs = {
+    'qa': lambda x: env.qa_hosts,
+}
 
 def deploy(deploy_env='qa', show_diffs='on'):
     """Start the deployment process for this project
@@ -449,20 +465,40 @@ def _get_data_path():
     return full_path
 
 
-@hosts(env.data_hosts)
-def list_saved_data():
-    """List saved data files from the data server
-    """
+def _quiet_remote_ls(path, fname_filter):
     with settings(hide('warnings', 'running', 'stdout', 'stderr'),
                   warn_only=True):
-        full_path = _get_data_path()
-        with cd(full_path):
-            print '%s: "%s"' % (env.host_string, full_path)
-            print run('ls *.tgz')
+        with cd(path):
+            return run('ls %s' % fname_filter)
 
 
-@hosts(env.data_hosts)
-def get_saved_data(fname):
+def list_saved_data(fname_filter='*.tgz'):
+    """List saved data files from the data server
+    """
+    full_path = _get_data_path()
+    path_filter = os.path.join(full_path, fname_filter)
+    for host in env.data_hosts:
+        puts('%s: "%s"' % (host, path_filter))
+        with settings(host_string=host):
+            current_files = _quiet_remote_ls(full_path, fname_filter)
+            puts(current_files)
+            return current_files.split()
+
+
+def get_saved_data(fname=None):
     """Retrieve saved data files from the data server
     """
-    get(os.path.join(_get_data_path(), fname), fname)
+    for host in env.data_hosts:
+        with settings(host_string=host):
+            if fname is None:
+                saved_data_action = 'retrieve'
+                hide_levels = ['warnings', 'running', 'stdout', 'stderr',
+                               'user']
+                with settings(hide(*hide_levels), warn_only=True):
+                    current_data = list_saved_data()
+                    current_data_string = '\t' + '\n\t'.join(current_data)
+                    most_recent_data = current_data[-1]
+                help_txt = DATA_HELP_TEXT % locals()
+                fname = prompt(help_txt, default=most_recent_data)
+            get(os.path.join(_get_data_path(), fname), fname)
+
