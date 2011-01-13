@@ -19,6 +19,8 @@ from fabric.api import run
 from fabric.api import settings
 from fabric.contrib.console import confirm
 from fabric.contrib.files import exists
+from fabric.operations import _shell_escape
+from fabric.state import output
 
 import py.path
 
@@ -485,20 +487,61 @@ def list_saved_data(fname_filter='*.tgz'):
             return current_files.split()
 
 
+def _get_data_fname(saved_data_action='retrieve'):
+   hide_levels = ['warnings', 'running', 'stdout', 'stderr',
+                  'user']
+   with settings(hide(*hide_levels), warn_only=True):
+       current_data = list_saved_data()
+       current_data_string = '\t' + '\n\t'.join(current_data)
+       most_recent_data = current_data[-1]
+   help_txt = DATA_HELP_TEXT % locals()
+   return prompt(help_txt, default=most_recent_data)
+
 def get_saved_data(fname=None):
-    """Retrieve saved data files from the data server
+    """Retrieve a saved data file from the data server
     """
     for host in env.data_hosts:
         with settings(host_string=host):
             if fname is None:
-                saved_data_action = 'retrieve'
-                hide_levels = ['warnings', 'running', 'stdout', 'stderr',
-                               'user']
-                with settings(hide(*hide_levels), warn_only=True):
-                    current_data = list_saved_data()
-                    current_data_string = '\t' + '\n\t'.join(current_data)
-                    most_recent_data = current_data[-1]
-                help_txt = DATA_HELP_TEXT % locals()
-                fname = prompt(help_txt, default=most_recent_data)
+                fname = _get_data_fname()
             get(os.path.join(_get_data_path(), fname), fname)
+
+
+def _sshagent_run(command, shell=True, pty=True):
+    """
+    Helper function.
+    Runs a command with SSH agent forwarding enabled.
+
+    Note:: Fabric (and paramiko) can't forward your SSH agent.
+    This helper uses your system's ssh to do so.
+    """
+    real_command = command
+    if shell:
+        cwd = env.get('cwd', '')
+        if cwd:
+            cwd = 'cd %s && ' % _shell_escape(cwd)
+        real_command = '%s "%s"' % (env.shell,
+            _shell_escape(cwd + real_command))
+    if output.debug:
+        print("[%s] run: %s" % (env.host_string, real_command))
+    elif output.running:
+        print("[%s] run: %s" % (env.host_string, command))
+    with settings(hide('warnings', 'running', 'stdout', 'stderr'),
+                  warn_only=True):
+        return local("ssh -A %s '%s'" % (env.host_string, real_command))
+
+
+def push_saved_data_to_qa(fname=None):
+    """Push a saved data file to QA
+    """
+    qa_path = os.path.join(env.base_qa_path, env.project_name, 'var')
+    for data_host in env.data_hosts:
+        with settings(host_string=data_host):
+            if fname is None:
+                fname = _get_data_fname('push')
+            fpath = os.path.join(_get_data_path(), fname)
+            for qa_host in env.qa_hosts:
+                with settings(host_string=qa_host, warn_only=True):
+                    cmd = 'scp %s:%s %s' % (data_host, fpath, qa_path)
+                    _sshagent_run(cmd)
 
