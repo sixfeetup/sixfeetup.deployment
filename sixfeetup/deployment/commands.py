@@ -97,9 +97,9 @@ env.qa_buildout_name = ""
 env.staging_buildout_name = ""
 env.prod_buildout_name = ""
 # supervisor process names
-env.qa_buildout_name = ""
-env.staging_buildout_name = ""
-env.prod_buildout_name = ""
+env.qa_supervisor_processes = ""
+env.staging_supervisor_processes = ""
+env.prod_supervisor_processes = ""
 # tag number
 env.deploy_tag = ""
 
@@ -107,20 +107,19 @@ env.roledefs = {
     'qa': lambda x: env.qa_hosts,
 }
 
-def deploy(deploy_env='qa', show_diffs='on'):
+def deploy(env='qa', diffs='on'):
     """Start the deployment process for this project
     """
     _release_manager_warning()
-    if deploy_env == 'qa':
-        choose_packages(show_diffs, save_choices='yes')
+    if env == 'qa':
+        choose_packages(diffs, save_choices='yes')
         release_packages(save_choices='yes')
         bump_package_versions()
         update_versions_cfg()
         tag_buildout()
-        #release_qa()
+        release_qa()
     else:
-        #eval("release_%s()" % deploy_env)
-        pass
+        eval("release_%s()" % env)
     _clear_previous_state()
     _release_manager_warning()
 
@@ -400,6 +399,7 @@ def tag_buildout():
 
 
 def release_qa():
+    print colors.blue("Releasing to QA")
     env.deploy_env = 'qa'
     for host in env.qa_hosts:
         with settings(host_string=host):
@@ -407,6 +407,7 @@ def release_qa():
 
 
 def release_staging():
+    print colors.blue("Releasing to staging")
     env.deploy_env = 'staging'
     for host in env.qa_hosts:
         with settings(host_string=host):
@@ -414,6 +415,7 @@ def release_staging():
 
 
 def release_prod():
+    print colors.blue("Releasing to prod")
     do_release = confirm("Are you sure?", default=False)
     if not do_release:
         abort("You didn't want to release")
@@ -439,16 +441,24 @@ def _release_to_env():
     if not env.deploy_tag:
         # TODO: give the user a list of tags here
         env.deploy_tag = prompt("What tag do you want to release?")
-    tag_url = "%s/%s" % (base_url, env.deploy_tag)
+    tag_url = "%s/tags/%s" % (base_url, env.deploy_tag)
     if not exists(buildout_dir):
-        abort("You need to create the initial env first...")
-        # TODO: add supervisor configs
+        abort("You need to create the initial env first: %s" % buildout_dir)
+        # TODO: add to supervisor configs
         #with cd(base_path):
         #    run("svn co %s %s" % (tag_url, buildout_name))
         #with cd(buildout_dir):
-        #    run("python%s bootstrap.py %s" % (env.python))
+        #    run("python%s bootstrap.py %s" % (
+        #        env.python_version,
+        #        env.bootstrap_args))
+    supervisor_processes = env.get(
+        "%s_supervisor_processes" % env.deploy_env,
+        "")
+    if not supervisor_processes:
+        abort("Couldn't find supervisor process names")
     # stop instance
-    run("supervisorctl stop %s" % env.supervisor_processes)
+    run("supervisorctl stop %s" % supervisor_processes)
+    # TODO: get the data from prod/staging here
     with cd(buildout_dir):
         # switch to the new tag
         run("svn switch %s" % tag_url)
@@ -456,7 +466,7 @@ def _release_to_env():
         # run buildout
         run("bin/buildout -v")
     # start instance
-    run("supervisorctl start %s" % env.supervisor_processes)
+    run("supervisorctl start %s" % supervisor_processes)
 
 
 def _get_data_path():
