@@ -407,7 +407,7 @@ def release_qa():
 def release_staging():
     print colors.blue("Releasing to staging")
     env.deploy_env = 'staging'
-    for host in env.qa_hosts:
+    for host in env.staging_hosts:
         with settings(host_string=host):
             _release_to_env()
 
@@ -418,7 +418,7 @@ def release_prod():
     if not do_release:
         abort("You didn't want to release")
     env.deploy_env = 'prod'
-    for host in env.qa_hosts:
+    for host in env.prod_hosts:
         with settings(host_string=host):
             _release_to_env()
 
