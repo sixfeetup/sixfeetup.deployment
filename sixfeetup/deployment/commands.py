@@ -459,6 +459,8 @@ def _release_to_env():
     run("supervisorctl stop %s" % supervisor_processes)
     # TODO: get the data from prod/staging here
     with cd(buildout_dir):
+        # XXX: Why did we have to do this? login shell borks things
+        env.shell = "/bin/bash -c"
         # TODO: Check for changes in the buildout
         # switch to the new tag
         run("svn switch %s" % tag_url)
