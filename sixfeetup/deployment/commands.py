@@ -13,6 +13,7 @@ from fabric.api import hosts
 from fabric.api import hide
 from fabric.api import get
 from fabric.contrib.console import confirm
+from fabric.contrib.files import exists
 from fabric import colors
 import py.path
 
@@ -63,19 +64,29 @@ env.package_dirs = ['src']
 env.ignore_dirs = []
 # extra information for a package
 env.package_info = {}
-env.valid_deploy_envs = ['qa', 'staging', 'prod']
 # QA server host
 env.qa_hosts = ["sfupqaapp01"]
 env.staging_hosts = ["sfupstaging01"]
 env.prod_hosts = []
-# Base path to instances
-env.base_qa_path = "/var/db/zope/dev"
-#env.base_staging_path = "/var/db/zope/maint"
 # Data server host
 env.data_hosts = ['extranet']
 # Data base path
 env.base_data_path = '/usr/local/www/data'
 env.full_data_path = ''
+# Base path to instances
+env.base_qa_path = "/var/db/zope/dev"
+env.base_staging_path = "/var/db/zope"
+env.base_prod_path = "/var/db/zope"
+# actual name of the buildout directory
+env.qa_buildout_name = ""
+env.staging_buildout_name = ""
+env.prod_buildout_name = ""
+# supervisor process names
+env.qa_buildout_name = ""
+env.staging_buildout_name = ""
+env.prod_buildout_name = ""
+# tag number
+env.deploy_tag = ""
 
 
 def deploy(deploy_env='qa', show_diffs='on'):
@@ -88,9 +99,10 @@ def deploy(deploy_env='qa', show_diffs='on'):
         bump_package_versions()
         update_versions_cfg()
         tag_buildout()
-        release_qa()
+        #release_qa()
     else:
-        eval("release_%s()" % deploy_env)
+        #eval("release_%s()" % deploy_env)
+        pass
     _clear_previous_state()
     _release_manager_warning()
 
@@ -343,13 +355,20 @@ def update_versions_cfg():
     local("svn ci -m 'updating versions for release' %s" % v_cfg)
 
 
+def _get_buildout_url():
+    """Get the base buildout url
+    """
+    wc = py.path.svnwc('.')
+    trunk_url = wc.url
+    base_dir = wc.svnurl().dirpath().url
+    return trunk_url, base_dir
+
+
 def tag_buildout():
     if not env.to_release:
         return
     print colors.blue("Tagging buildout")
-    wc = py.path.svnwc('.')
-    trunk_url = wc.url
-    base_dir = wc.svnurl().dirpath().url
+    trunk_url, base_dir = _get_buildout_url()
     with open('version.txt') as f:
         version = f.read().strip()
     local("svn cp -m 'tagging for release' %s %s/tags/%s" % (
@@ -362,32 +381,65 @@ def tag_buildout():
     local("svn ci -m 'bumping version for next release' version.txt")
 
 
-def _get_deploy_env():
-    """Get the deploy env from the user
-    """
-    while True:
-        deploy_env = prompt("What envrionment are you deploying to?").lower()
-        if deploy_env in env.valid_deploy_envs:
-            return deploy_env
-
-
-@hosts(env.qa_hosts)
 def release_qa():
-    _release_to_env()
+    env.deploy_env = 'qa'
+    for host in env.qa_hosts:
+        with settings(host_string=host):
+            _release_to_env()
 
 
-def _release_to_env(deploy_tag=""):
+def release_staging():
+    env.deploy_env = 'staging'
+    for host in env.qa_hosts:
+        with settings(host_string=host):
+            _release_to_env()
+
+
+def release_prod():
+    do_release = confirm("Are you sure?", default=False)
+    if not do_release:
+        abort("You didn't want to release")
+    env.deploy_env = 'prod'
+    for host in env.qa_hosts:
+        with settings(host_string=host):
+            _release_to_env()
+
+
+def _release_to_env():
     """Release to a particular environment
     """
-    if not deploy_tag:
-        deploy_tag = prompt("What tag are you deploying?")
-    print run('ls')
+    import pdb; pdb.set_trace()
+    base_env_path = "base_%s_path" % env.deploy_env
+    base_path = env.get(base_env_path, "")
+    if not base_path:
+        abort("Couldn't find %s" % base_env_path)
+    buildout_name = env.get("%s_buildout_name" % env.deploy_env, "")
+    if not buildout_name:
+        abort("Buildout name not defined for %s" % env.deploy_env)
+    # check for the buildout
+    buildout_dir = "%s/%s" % (base_path, buildout_name)
+    trunk_url, base_url = _get_buildout_url()
+    if not env.deploy_tag:
+        # TODO: give the user a list of tags here
+        env.deploy_tag = prompt("What tag do you want to release?")
+    tag_url = "%s/%s" % (base_url, env.deploy_tag)
+    if not exists(buildout_dir):
+        abort("You need to create the initial env first...")
+        # TODO: add supervisor configs
+        #with cd(base_path):
+        #    run("svn co %s %s" % (tag_url, buildout_name))
+        #with cd(buildout_dir):
+        #    run("python%s bootstrap.py %s" % (env.python))
     # stop instance
-    # switch to the new tag
-    #   check for errors?
-    # run buildout
+    run("supervisorctl stop %s" % env.supervisor_processes)
+    with cd(buildout_dir):
+        # switch to the new tag
+        run("svn switch %s" % tag_url)
+        # XXX: check for issues with switch
+        # run buildout
+        run("bin/buildout -v")
     # start instance
-    pass
+    run("supervisorctl start %s" % env.supervisor_processes)
 
 
 def _get_data_path():
