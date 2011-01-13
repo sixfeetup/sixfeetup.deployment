@@ -2,7 +2,7 @@ import os
 import pickle
 import re
 
-from datetime import date
+import datetime
 
 import distutils.version
 
@@ -16,6 +16,7 @@ from fabric.api import local
 from fabric.api import prompt
 from fabric.api import puts
 from fabric.api import run
+from fabric.api import sudo
 from fabric.api import settings
 from fabric.contrib.console import confirm
 from fabric.contrib.files import exists
@@ -103,9 +104,6 @@ env.prod_supervisor_processes = ""
 # tag number
 env.deploy_tag = ""
 
-env.roledefs = {
-    'qa': lambda x: env.qa_hosts,
-}
 
 def deploy(env='qa', diffs='on'):
     """Start the deployment process for this project
@@ -484,6 +482,14 @@ def _quiet_remote_ls(path, fname_filter):
             return run('ls %s' % fname_filter)
 
 
+def _quiet_remote_mkdir(path):
+    if exists(path):
+        return
+    with settings(hide('warnings', 'running', 'stdout', 'stderr'),
+                  warn_only=True):
+        return sudo('mkdir -p %s' % path)
+
+
 def list_saved_data(fname_filter='*.tgz'):
     """List saved data files from the data server
     """
@@ -506,6 +512,7 @@ def _get_data_fname(saved_data_action='retrieve'):
        most_recent_data = current_data[-1]
    help_txt = DATA_HELP_TEXT % locals()
    return prompt(help_txt, default=most_recent_data)
+
 
 def get_saved_data(fname=None):
     """Retrieve a saved data file from the data server
@@ -555,3 +562,55 @@ def push_saved_data_to_qa(fname=None):
                     cmd = 'scp %s:%s %s' % (data_host, fpath, qa_path)
                     _sshagent_run(cmd)
 
+
+def _retrieve_datafs(host_type, path):
+    data_host = env.data_hosts[0]
+    src_path = os.path.join(path, 'var', 'filestorage', 'Data.fs')
+    src_host_string = ':'.join([env.host_string, src_path])
+    target_path = os.path.join(env.base_data_path,
+                               env.project_name,
+                               'data', 'current_prod')
+    today = datetime.date.today().strftime('%Y-%m-%d')
+    filename_test = 'Data.fs-%s-%s-%s-*.tgz' % (env.project_name,
+                                                host_type,
+                                                today)
+    data_path = _get_data_path()
+    result = _quiet_remote_ls(data_path, filename_test)
+    existing_files = result.split()
+    filename = 'Data.fs-%s-%s-%s-%02d.tgz' % (env.project_name,
+                                              host_type,
+                                              today,
+                                              len(existing_files)+1)
+    # Ensure the `current_prod` dir exists
+    result = _quiet_remote_mkdir(target_path)
+    with settings(host_string=data_host):
+        _sshagent_run('rsync -z --inplace %s %s' % (src_host_string,
+                                                   target_path))
+        with cd(target_path):
+            result = run('tar czf %s Data.fs' % filename)
+            if result.succeeded:
+                run('mv %s ..' % filename)
+            else:
+                run('rm -f %s' % filename)
+
+
+def retrieve_data(role='prod', data_type='Data.fs'):
+    """Retrieve a set of data from either prod or staging.
+    """
+    puts('Retrieving the %s for %s' % (data_type, role))
+    if role == 'prod':
+        hosts = env.prod_hosts
+        base_path = env.base_prod_path
+    elif role == 'staging':
+        hosts = env.staging_hosts
+        base_path = env.base_staging_path
+    else:
+        abort('Role must be either "prod" or "staging".')
+    if data_type != 'Data.fs':
+        abort('The only supported data_type is "Data.fs".')
+    project_path = os.path.join(base_path,
+                                env.project_name)
+    for host in hosts:
+        with settings(host_string=host):
+            if data_type == 'Data.fs':
+                _retrieve_datafs(role, project_path)
