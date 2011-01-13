@@ -408,7 +408,6 @@ def release_prod():
 def _release_to_env():
     """Release to a particular environment
     """
-    import pdb; pdb.set_trace()
     base_env_path = "base_%s_path" % env.deploy_env
     base_path = env.get(base_env_path, "")
     if not base_path:
