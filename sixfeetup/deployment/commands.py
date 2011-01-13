@@ -462,6 +462,7 @@ def _release_to_env():
         # XXX: Why did we have to do this? login shell borks things
         env.shell = "/bin/bash -c"
         # TODO: Check for changes in the buildout
+        # TODO: Make this work as a particular user (namely zope)
         # switch to the new tag
         run("svn switch %s" % tag_url)
         # TODO: check for issues with switch
