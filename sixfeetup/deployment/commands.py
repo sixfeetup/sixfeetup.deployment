@@ -1,28 +1,13 @@
 import os
 import pickle
 import re
-
 import datetime
-
 import distutils.version
-
 from fabric import colors
-from fabric.api import abort
-from fabric.api import cd
-from fabric.api import env
-from fabric.api import get
-from fabric.api import hide
-from fabric.api import local
-from fabric.api import prompt
-from fabric.api import puts
-from fabric.api import run
-from fabric.api import settings
-from fabric.api import sudo
-from fabric.contrib.console import confirm
-from fabric.contrib.files import exists
+from fabric import api
+from fabric import contrib
 from fabric.operations import _shell_escape
 from fabric.state import output
-
 import py.path
 
 TRUISMS = [
@@ -60,49 +45,49 @@ Current saved data files:
 Enter a file name to %(saved_data_action)s:"""
 
 # URL to the trac instance base
-env.trac_url_base = 'https://trac.sixfeetup.com'
+api.env.trac_url_base = 'https://trac.sixfeetup.com'
 # This is the trac/svn/dist/extranet name
-env.project_name = ""
+api.env.project_name = ""
 # List of package paths
 # XXX: this shouldn't have to be paths...
-env.packages = []
+api.env.packages = []
 # Default release target. This is a jarn.mkrelease target name
-env.default_release_target = 'public'
+api.env.default_release_target = 'public'
 # The default path and regex for version number changing
-env.default_version_location = ['setup.py', SETUPPY_VERSION]
+api.env.default_version_location = ['setup.py', SETUPPY_VERSION]
 # location of the versions.cfg file
-env.versions_cfg_location = "profiles/versions.cfg"
+api.env.versions_cfg_location = "profiles/versions.cfg"
 # List of packages to release
-env.to_release = []
+api.env.to_release = []
 # This is a directory that contains the eggs we want to release
-env.package_dirs = ['src']
+api.env.package_dirs = ['src']
 # List of package path names to ignore (e.g. 'my.package')
-env.ignore_dirs = []
+api.env.ignore_dirs = []
 # extra information for a package
-env.package_info = {}
+api.env.package_info = {}
 # QA server host
-env.qa_hosts = ["sfupqaapp01"]
-env.staging_hosts = ["sfupstaging01"]
-env.prod_hosts = []
+api.env.qa_hosts = ["sfupqaapp01"]
+api.env.staging_hosts = ["sfupstaging01"]
+api.env.prod_hosts = []
 # Data server host
-env.data_hosts = ['extranet']
+api.env.data_hosts = ['extranet']
 # Data base path
-env.base_data_path = '/usr/local/www/data'
-env.full_data_path = ''
+api.env.base_data_path = '/usr/local/www/data'
+api.env.full_data_path = ''
 # Base path to instances
-env.base_qa_path = "/var/db/zope/dev"
-env.base_staging_path = "/var/db/zope"
-env.base_prod_path = "/var/db/zope"
+api.env.base_qa_path = "/var/db/zope/dev"
+api.env.base_staging_path = "/var/db/zope"
+api.env.base_prod_path = "/var/db/zope"
 # actual name of the buildout directory
-env.qa_buildout_name = ""
-env.staging_buildout_name = ""
-env.prod_buildout_name = ""
+api.env.qa_buildout_name = ""
+api.env.staging_buildout_name = ""
+api.env.prod_buildout_name = ""
 # supervisor process names
-env.qa_supervisor_processes = ""
-env.staging_supervisor_processes = ""
-env.prod_supervisor_processes = ""
+api.env.qa_supervisor_processes = ""
+api.env.staging_supervisor_processes = ""
+api.env.prod_supervisor_processes = ""
 # tag number
-env.deploy_tag = ""
+api.env.deploy_tag = ""
 
 
 def deploy(env='qa', diffs='on'):
@@ -129,34 +114,34 @@ def _release_manager_warning():
 Check the following URL before continuing:
 %s/%s/%s
 """ % (colors.red("Are there any release manager tickets?", bold=True),
-       env.trac_url_base,
-       env.project_name,
+       api.env.trac_url_base,
+       api.env.project_name,
        "query?status=awaiting+release+action")
-    prompt("Press return to continue")
+    api.prompt("Press return to continue")
 
 
 def list_package_candidates(verbose='yes'):
     """List the packages that are available for deployment"""
-    ignore_dirs = env.ignore_dirs + GLOBAL_IGNORES
+    ignore_dirs = api.env.ignore_dirs + GLOBAL_IGNORES
     # find all the packages in the given package dirs
-    for package_dir in env.package_dirs:
+    for package_dir in api.env.package_dirs:
         items = os.listdir(package_dir)
         for item in items:
             if item not in ignore_dirs:
                 package_path = '%s/%s' % (package_dir, item)
                 if os.path.isdir(package_path):
-                    with cd(package_path):
+                    with api.cd(package_path):
                         # get the actual package name from the setup.py
-                        package_name = local("python setup.py --name")
-                    if not package_name in env.package_info:
-                        env.package_info[package_name] = {}
-                    env.package_info[package_name]['path'] = package_path
-                    env.packages.append(package_name)
+                        package_name = api.local("python setup.py --name")
+                    if not package_name in api.env.package_info:
+                        api.env.package_info[package_name] = {}
+                    api.env.package_info[package_name]['path'] = package_path
+                    api.env.packages.append(package_name)
     if verbose.lower() in TRUISMS:
         print """
 Packages available:
 %s
-""" % "\n".join(env.packages)
+""" % "\n".join(api.env.packages)
 
 
 def _find_tags_url(wc):
@@ -177,15 +162,16 @@ def _find_tags_url(wc):
 def _load_previous_state(save_choices):
     """Get state info from the saved pickle
     """
+    msg = "Do you want to use the previously saved choices?"
     if (save_choices and
       os.path.exists('.saved_choices') and
-      confirm("Do you want to use the previously saved choices?")):
+      contrib.console.confirm(msg)):
         with open('.saved_choices') as f:
-            env.package_info = pickle.load(f)
-            env.to_release = [
+            api.env.package_info = pickle.load(f)
+            api.env.to_release = [
                 package
-                for package in env.package_info
-                if env.package_info[package].get('release', False)]
+                for package in api.env.package_info
+                if api.env.package_info[package].get('release', False)]
         return True
     elif os.path.exists('.saved_choices'):
         os.unlink('.saved_choices')
@@ -204,8 +190,8 @@ def choose_packages(show_diff='yes', save_choices='no'):
     if _load_previous_state(save_choices):
         return
     list_package_candidates()
-    for package in env.packages:
-        wc = py.path.svnwc(env.package_info[package]['path'])
+    for package in api.env.packages:
+        wc = py.path.svnwc(api.env.package_info[package]['path'])
         wc_url = wc.url
         if show_diff.lower() in TRUISMS:
             tags_url = _find_tags_url(wc)
@@ -224,24 +210,24 @@ def choose_packages(show_diff='yes', save_choices='no'):
                 default_tag = 'None'
                 if len(current_tags) > 0:
                     default_tag = current_tags[-1]
-                cmp_tag = prompt(help_txt, default=default_tag)
+                cmp_tag = api.prompt(help_txt, default=default_tag)
                 if cmp_tag.lower() in PASS_ME or cmp_tag in current_tags:
                     break
             if cmp_tag.lower() not in PASS_ME:
                 cmd = 'svn diff %(tags_url)s/%(cmp_tag)s %(wc_url)s |colordiff'
-                print local(cmd % locals())
+                print api.local(cmd % locals())
         while True:
-            release_package = prompt(
+            release_package = api.prompt(
                 "Does '%s' need a release?" % package, default="no").lower()
             if release_package in TRUISMS:
-                env.package_info[package]['release'] = True
-                env.to_release.append(package)
+                api.env.package_info[package]['release'] = True
+                api.env.to_release.append(package)
             # make sure the question was answered properly
             if release_package in YES_OR_NO:
                 break
     if save_choices:
         with open('.saved_choices', 'w') as f:
-            pickle.dump(env.package_info, f)
+            pickle.dump(api.env.package_info, f)
 
 
 def _next_minor_version(version_string):
@@ -253,67 +239,69 @@ def _next_minor_version(version_string):
 
 def release_packages(verbose="no", dev="no", save_choices='no'):
     save_choices = save_choices.lower() in TRUISMS
-    if not env.to_release:
+    if not api.env.to_release:
         print colors.yellow("\nNo packages to release.")
         return
     print colors.blue("\nReleasing packages")
-    print "\n".join(env.to_release) + "\n"
-    for package in env.to_release:
-        package_info = env.package_info[package]
+    print "\n".join(api.env.to_release) + "\n"
+    for package in api.env.to_release:
+        package_info = api.env.package_info[package]
         # first check to see if this version of the package was already
         # released
         current_release = package_info.get('released_version', None)
-        with cd(package_info['path']):
-            current_version = local("python setup.py --version")
+        with api.cd(package_info['path']):
+            current_version = api.local("python setup.py --version")
         if current_release is not None and current_release == current_version:
             msg = "%s version %s has already been released"
             print colors.red(msg % (package, current_version))
             # since it was already release, just move on to the next package
             continue
         package_path = package_info['path']
-        package_target = package_info.get('target', env.default_release_target)
+        package_target = package_info.get(
+            'target',
+            api.env.default_release_target)
         cmd = "mkrelease %s -d %s %s"
         # TODO: handle dev release
         # TODO: alternate release targets (e.g. private)
-        with settings(warn_only=True):
-            output = local(
+        with api.settings(warn_only=True):
+            output = api.local(
                 cmd % ("-C", package_target, package_path))
         if output.failed:
             print output
-            abort(output.stderr)
+            api.abort(output.stderr)
         # search through the mkrelease output to find the version number
         tag_output = re.search('Tagging %s (.*)' % package, output)
         if tag_output is not None and len(tag_output.groups()):
             package_version = tag_output.groups()[0]
         else:
             print output
-            abort("Could not find package version from mkrelease output")
-        env.package_info[package]['version'] = package_version
-        env.package_info[package]['next_version'] = _next_minor_version(
+            api.abort("Could not find package version from mkrelease output")
+        api.env.package_info[package]['version'] = package_version
+        api.env.package_info[package]['next_version'] = _next_minor_version(
             package_version)
-        env.package_info[package]['released_version'] = package_version
+        api.env.package_info[package]['released_version'] = package_version
         if save_choices:
             with open('.saved_choices', 'w') as f:
-                pickle.dump(env.package_info, f)
+                pickle.dump(api.env.package_info, f)
         if verbose.lower() in TRUISMS:
             print output
 
 
 def bump_package_versions():
-    if not env.to_release:
+    if not api.env.to_release:
         return
     print colors.blue("Bumping package versions")
     bumpers = [
-        "%s %s" % (package, env.package_info[package]['next_version'])
-        for package in env.package_info
-        if env.package_info[package].get('release', False)]
+        "%s %s" % (package, api.env.package_info[package]['next_version'])
+        for package in api.env.package_info
+        if api.env.package_info[package].get('release', False)]
     print "\n".join(bumpers)
-    for package in env.to_release:
-        package_info = env.package_info[package]
+    for package in api.env.to_release:
+        package_info = api.env.package_info[package]
         next_version = package_info['next_version']
         version_location = package_info.get(
             'version_location',
-            env.default_version_location)
+            api.env.default_version_location)
         version_file = "%s/%s" % (package_info['path'], version_location[0])
         version_re = version_location[1]
         if os.path.exists(version_file):
@@ -327,24 +315,24 @@ def bump_package_versions():
                     re.M)
                 f.write(vf_new)
             cmd = "svn ci -m 'bumping version for next release' %s"
-            local(cmd % version_file)
+            api.local(cmd % version_file)
 
 
 def update_versions_cfg():
     """Update the versions.cfg with the packages that have changed
     """
-    if not env.to_release:
+    if not api.env.to_release:
         return
     print colors.blue("Updating versions.cfg")
     # get the version file contents
-    v_cfg = env.versions_cfg_location
+    v_cfg = api.env.versions_cfg_location
     with open(v_cfg) as f:
         vcfg_content = f.read()
     missing_versions = []
     # loop through the packages and update the versions
     with open(v_cfg, 'w') as f:
-        for package in env.to_release:
-            package_info = env.package_info[package]
+        for package in api.env.to_release:
+            package_info = api.env.package_info[package]
             package_version = package_info['version']
             package_re = "%s.*" % package
             version_pins = re.findall(package_re, vcfg_content)
@@ -367,7 +355,7 @@ def update_versions_cfg():
         with open(v_cfg, 'a') as f:
             for missing in missing_versions:
                 f.write("%s\n" % missing)
-    local("svn ci -m 'updating versions for release' %s" % v_cfg)
+    api.local("svn ci -m 'updating versions for release' %s" % v_cfg)
 
 
 def _get_buildout_url():
@@ -380,119 +368,122 @@ def _get_buildout_url():
 
 
 def tag_buildout():
-    if not env.to_release:
+    if not api.env.to_release:
         return
     print colors.blue("Tagging buildout")
     trunk_url, base_dir = _get_buildout_url()
     with open('version.txt') as f:
         version = f.read().strip()
-    local("svn cp -m 'tagging for release' %s %s/tags/%s" % (
+    api.local("svn cp -m 'tagging for release' %s %s/tags/%s" % (
         trunk_url, base_dir, version))
     # now bump the version and commit
     with open('version.txt', 'w') as f:
         new_version = _next_minor_version(version)
         f.write(new_version)
-    env.deploy_tag = version
-    local("svn ci -m 'bumping version for next release' version.txt")
+    api.env.deploy_tag = version
+    api.local("svn ci -m 'bumping version for next release' version.txt")
 
 
 def release_qa():
     print colors.blue("Releasing to QA")
-    env.deploy_env = 'qa'
-    for host in env.qa_hosts:
-        with settings(host_string=host):
+    api.env.deploy_env = 'qa'
+    for host in api.env.qa_hosts:
+        with api.settings(host_string=host):
             _release_to_env()
 
 
 def release_staging():
     print colors.blue("Releasing to staging")
-    env.deploy_env = 'staging'
-    for host in env.staging_hosts:
-        with settings(host_string=host):
+    api.env.deploy_env = 'staging'
+    for host in api.env.staging_hosts:
+        with api.settings(host_string=host):
             _release_to_env()
 
 
 def release_prod():
     print colors.blue("Releasing to prod")
-    do_release = confirm("Are you sure?", default=False)
+    do_release = contrib.console.confirm("Are you sure?", default=False)
     if not do_release:
-        abort("You didn't want to release")
-    env.deploy_env = 'prod'
-    for host in env.prod_hosts:
-        with settings(host_string=host):
+        api.abort("You didn't want to release")
+    api.env.deploy_env = 'prod'
+    for host in api.env.prod_hosts:
+        with api.settings(host_string=host):
             _release_to_env()
 
 
 def _release_to_env():
     """Release to a particular environment
     """
-    base_env_path = "base_%s_path" % env.deploy_env
-    base_path = env.get(base_env_path, "")
+    base_env_path = "base_%s_path" % api.env.deploy_env
+    base_path = api.env.get(base_env_path, "")
     if not base_path:
-        abort("Couldn't find %s" % base_env_path)
-    buildout_name = env.get("%s_buildout_name" % env.deploy_env, "")
+        api.abort("Couldn't find %s" % base_env_path)
+    buildout_name = api.env.get("%s_buildout_name" % api.env.deploy_env, "")
     if not buildout_name:
-        abort("Buildout name not defined for %s" % env.deploy_env)
+        api.abort("Buildout name not defined for %s" % api.env.deploy_env)
     # check for the buildout
     buildout_dir = "%s/%s" % (base_path, buildout_name)
     trunk_url, base_url = _get_buildout_url()
-    if not env.deploy_tag:
+    if not api.env.deploy_tag:
         # TODO: give the user a list of tags here
-        env.deploy_tag = prompt("What tag do you want to release?")
-    tag_url = "%s/tags/%s" % (base_url, env.deploy_tag)
-    if not exists(buildout_dir):
-        abort("You need to create the initial env first: %s" % buildout_dir)
+        api.env.deploy_tag = api.prompt("What tag do you want to release?")
+    tag_url = "%s/tags/%s" % (base_url, api.env.deploy_tag)
+    if not contrib.files.exists(buildout_dir):
+        api.abort(
+            "You need to create the initial api.env first: %s" % buildout_dir)
         # TODO: add to supervisor configs
         #with cd(base_path):
-        #    run("svn co %s %s" % (tag_url, buildout_name))
+        #    api.run("svn co %s %s" % (tag_url, buildout_name))
         #    # TODO: make sure project is chowned and chmoded properly
         #with cd(buildout_dir):
-        #    run("python%s bootstrap.py %s" % (
-        #        env.python_version,
-        #        env.bootstrap_args))
-    supervisor_processes = env.get(
-        "%s_supervisor_processes" % env.deploy_env,
+        #    api.run("python%s bootstrap.py %s" % (
+        #        api.env.python_version,
+        #        api.env.bootstrap_args))
+    supervisor_processes = api.env.get(
+        "%s_supervisor_processes" % api.env.deploy_env,
         "")
     if not supervisor_processes:
-        abort("Couldn't find supervisor process names")
+        api.abort("Couldn't find supervisor process names")
     # stop instance
-    run("supervisorctl stop %s" % supervisor_processes)
+    api.run("supervisorctl stop %s" % supervisor_processes)
     # TODO: get the data from prod/staging here
-    with cd(buildout_dir):
+    with api.cd(buildout_dir):
         # XXX: Why did we have to do this? login shell borks things
-        env.shell = "/bin/bash -c"
+        api.env.shell = "/bin/bash -c"
         # TODO: Check for changes in the buildout
         # TODO: Make this work as a particular user (namely zope)
         # switch to the new tag
-        run("svn switch %s" % tag_url)
+        api.run("svn switch %s" % tag_url)
         # TODO: check for issues with switch
         # run buildout
-        run("bin/buildout -v")
+        api.run("bin/buildout -v")
     # start instance
-    run("supervisorctl start %s" % supervisor_processes)
+    api.run("supervisorctl start %s" % supervisor_processes)
 
 
 def _get_data_path():
-    if env.full_data_path:
-        full_path = env.full_data_path
+    if api.env.full_data_path:
+        full_path = api.env.full_data_path
     else:
-        full_path = os.path.join(env.base_data_path, env.project_name, 'data')
+        full_path = os.path.join(
+            api.env.base_data_path, api.env.project_name,
+            'data')
     return full_path
 
 
 def _quiet_remote_ls(path, fname_filter):
-    with settings(hide('warnings', 'running', 'stdout', 'stderr'),
+    with api.settings(api.hide('warnings', 'running', 'stdout', 'stderr'),
                   warn_only=True):
-        with cd(path):
-            return run('ls %s' % fname_filter)
+        with api.cd(path):
+            return api.run('ls %s' % fname_filter)
 
 
 def _quiet_remote_mkdir(path):
-    if exists(path):
+    if contrib.files.exists(path):
         return
-    with settings(hide('warnings', 'running', 'stdout', 'stderr'),
+    with api.settings(api.hide('warnings', 'running', 'stdout', 'stderr'),
                   warn_only=True):
-        return sudo('mkdir -p %s' % path)
+        return api.sudo('mkdir -p %s' % path)
 
 
 def list_saved_data(fname_filter='*.tgz'):
@@ -500,33 +491,33 @@ def list_saved_data(fname_filter='*.tgz'):
     """
     full_path = _get_data_path()
     path_filter = os.path.join(full_path, fname_filter)
-    for host in env.data_hosts:
-        puts('%s: "%s"' % (host, path_filter))
-        with settings(host_string=host):
+    for host in api.env.data_hosts:
+        api.puts('%s: "%s"' % (host, path_filter))
+        with api.settings(host_string=host):
             current_files = _quiet_remote_ls(full_path, fname_filter)
-            puts(current_files)
+            api.puts(current_files)
             return current_files.split()
 
 
 def _get_data_fname(saved_data_action='retrieve'):
    hide_levels = ['warnings', 'running', 'stdout', 'stderr',
                   'user']
-   with settings(hide(*hide_levels), warn_only=True):
+   with api.settings(api.hide(*hide_levels), warn_only=True):
        current_data = list_saved_data()
        current_data_string = '\t' + '\n\t'.join(current_data)
        most_recent_data = current_data[-1]
    help_txt = DATA_HELP_TEXT % locals()
-   return prompt(help_txt, default=most_recent_data)
+   return api.prompt(help_txt, default=most_recent_data)
 
 
 def get_saved_data(fname=None):
     """Retrieve a saved data file from the data server
     """
-    for host in env.data_hosts:
-        with settings(host_string=host):
+    for host in api.env.data_hosts:
+        with api.settings(host_string=host):
             if fname is None:
                 fname = _get_data_fname()
-            get(os.path.join(_get_data_path(), fname), fname)
+            api.get(os.path.join(_get_data_path(), fname), fname)
 
 
 def _sshagent_run(command, shell=True, pty=True):
@@ -539,83 +530,84 @@ def _sshagent_run(command, shell=True, pty=True):
     """
     real_command = command
     if shell:
-        cwd = env.get('cwd', '')
+        cwd = api.env.get('cwd', '')
         if cwd:
             cwd = 'cd %s && ' % _shell_escape(cwd)
-        real_command = '%s "%s"' % (env.shell,
+        real_command = '%s "%s"' % (api.env.shell,
             _shell_escape(cwd + real_command))
     if output.debug:
-        print("[%s] run: %s" % (env.host_string, real_command))
+        print("[%s] run: %s" % (api.env.host_string, real_command))
     elif output.running:
-        print("[%s] run: %s" % (env.host_string, command))
-    with settings(hide('warnings', 'running', 'stdout', 'stderr'),
+        print("[%s] run: %s" % (api.env.host_string, command))
+    with api.settings(api.hide('warnings', 'running', 'stdout', 'stderr'),
                   warn_only=True):
-        return local("ssh -A %s '%s'" % (env.host_string, real_command))
+        return api.local(
+            "ssh -A %s '%s'" % (api.env.host_string, real_command))
 
 
 def push_saved_data_to_qa(fname=None):
     """Push a saved data file to QA
     """
-    qa_path = os.path.join(env.base_qa_path, env.project_name, 'var')
-    for data_host in env.data_hosts:
-        with settings(host_string=data_host):
+    qa_path = os.path.join(api.env.base_qa_path, api.env.project_name, 'var')
+    for data_host in api.env.data_hosts:
+        with api.settings(host_string=data_host):
             if fname is None:
                 fname = _get_data_fname('push')
             fpath = os.path.join(_get_data_path(), fname)
-            for qa_host in env.qa_hosts:
-                with settings(host_string=qa_host, warn_only=True):
+            for qa_host in api.env.qa_hosts:
+                with api.settings(host_string=qa_host, warn_only=True):
                     cmd = 'scp %s:%s %s' % (data_host, fpath, qa_path)
                     _sshagent_run(cmd)
 
 
 def _retrieve_datafs(host_type, path):
-    data_host = env.data_hosts[0]
+    data_host = api.env.data_hosts[0]
     src_path = os.path.join(path, 'var', 'filestorage', 'Data.fs')
-    src_host_string = ':'.join([env.host_string, src_path])
-    target_path = os.path.join(env.base_data_path,
-                               env.project_name,
+    src_host_string = ':'.join([api.env.host_string, src_path])
+    target_path = os.path.join(api.env.base_data_path,
+                               api.env.project_name,
                                'data', 'current_prod')
     today = datetime.date.today().strftime('%Y-%m-%d')
-    filename_test = 'Data.fs-%s-%s-%s-*.tgz' % (env.project_name,
+    filename_test = 'Data.fs-%s-%s-%s-*.tgz' % (api.env.project_name,
                                                 host_type,
                                                 today)
     data_path = _get_data_path()
     result = _quiet_remote_ls(data_path, filename_test)
     existing_files = result.split()
-    filename = 'Data.fs-%s-%s-%s-%02d.tgz' % (env.project_name,
+    filename = 'Data.fs-%s-%s-%s-%02d.tgz' % (api.env.project_name,
                                               host_type,
                                               today,
                                               len(existing_files)+1)
     # Ensure the `current_prod` dir exists
     result = _quiet_remote_mkdir(target_path)
-    with settings(host_string=data_host):
+    with api.settings(host_string=data_host):
         _sshagent_run('rsync -z --inplace %s %s' % (src_host_string,
                                                    target_path))
-        with cd(target_path):
-            result = run('tar czf %s Data.fs' % filename)
+        with api.cd(target_path):
+            result = api.run('tar czf %s Data.fs' % filename)
             if result.succeeded:
-                run('mv %s ..' % filename)
+                api.run('mv %s ..' % filename)
             else:
-                run('rm -f %s' % filename)
+                api.run('rm -f %s' % filename)
 
 
 def retrieve_data(role='prod', data_type='Data.fs'):
     """Retrieve a set of data from either prod or staging.
     """
-    puts('Retrieving the %s for %s' % (data_type, role))
+    api.puts('Retrieving the %s for %s' % (data_type, role))
     if role == 'prod':
-        hosts = env.prod_hosts
-        base_path = env.base_prod_path
+        hosts = api.env.prod_hosts
+        base_path = api.env.base_prod_path
     elif role == 'staging':
-        hosts = env.staging_hosts
-        base_path = env.base_staging_path
+        hosts = api.env.staging_hosts
+        base_path = api.env.base_staging_path
     else:
-        abort('Role must be either "prod" or "staging".')
+        api.abort('Role must be either "prod" or "staging".')
     if data_type != 'Data.fs':
-        abort('The only supported data_type is "Data.fs".')
+        api.abort('The only supported data_type is "Data.fs".')
     project_path = os.path.join(base_path,
-                                env.project_name)
+                                api.env.project_name)
     for host in hosts:
-        with settings(host_string=host):
+        with api.settings(host_string=host):
             if data_type == 'Data.fs':
                 _retrieve_datafs(role, project_path)
