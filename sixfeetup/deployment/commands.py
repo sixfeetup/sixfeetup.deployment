@@ -16,8 +16,8 @@ from fabric.api import local
 from fabric.api import prompt
 from fabric.api import puts
 from fabric.api import run
-from fabric.api import sudo
 from fabric.api import settings
+from fabric.api import sudo
 from fabric.contrib.console import confirm
 from fabric.contrib.files import exists
 from fabric.operations import _shell_escape
