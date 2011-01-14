@@ -1,0 +1,4 @@
+- Change data syncing to subdirs (current_prod/filestorage|blobstorage|solr etc)
+- Use rsync to pull down data from extranet instead of the tarball
+- Update release process to prompt for refreshing data from extranet
+- Refactor release_* commands to be a single command accepting a parameter
