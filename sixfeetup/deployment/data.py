@@ -1,9 +1,9 @@
 import os
 import datetime
 from fabric import api
-from fabric.operations import _shell_escape
-from fabric.state import output
-from sixfeetup.deployment.utils import _quiet_remote_mkdir, _quiet_remote_ls
+from sixfeetup.deployment.utils import (_quiet_remote_ls,
+                                        _quiet_remote_mkdir,
+                                        _sshagent_run)
 
 
 DATA_HELP_TEXT = """
@@ -58,31 +58,6 @@ def get_saved_data(fname=None):
             if fname is None:
                 fname = _get_data_fname()
             api.get(os.path.join(_get_data_path(), fname), fname)
-
-
-def _sshagent_run(command, shell=True, pty=True):
-    """
-    Helper function.
-    Runs a command with SSH agent forwarding enabled.
-
-    Note:: Fabric (and paramiko) can't forward your SSH agent.
-    This helper uses your system's ssh to do so.
-    """
-    real_command = command
-    if shell:
-        cwd = api.env.get('cwd', '')
-        if cwd:
-            cwd = 'cd %s && ' % _shell_escape(cwd)
-        real_command = '%s "%s"' % (api.env.shell,
-            _shell_escape(cwd + real_command))
-    if output.debug:
-        print("[%s] run: %s" % (api.env.host_string, real_command))
-    elif output.running:
-        print("[%s] run: %s" % (api.env.host_string, command))
-    with api.settings(api.hide('warnings', 'running', 'stdout', 'stderr'),
-                  warn_only=True):
-        return api.local(
-            "ssh -A %s '%s'" % (api.env.host_string, real_command))
 
 
 def push_saved_data_to_qa(fname=None):
