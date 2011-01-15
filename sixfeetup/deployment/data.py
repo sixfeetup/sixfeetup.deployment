@@ -100,7 +100,7 @@ def push_saved_data_to_qa(fname=None):
                     _sshagent_run(cmd)
 
 
-def _retrieve_datafs(host_type, path):
+def _sync_datafs(host_type, path):
     data_host = api.env.data_hosts[0]
     src_path = os.path.join(path, 'var', 'filestorage', 'Data.fs')
     src_host_string = ':'.join([api.env.host_string, src_path])
@@ -131,20 +131,19 @@ def _retrieve_datafs(host_type, path):
                 api.run('rm -f %s' % filename)
 
 
-def retrieve_data(role='prod', data_type='Data.fs'):
+def sync_data(role='prod', data_type='Data.fs'):
     """Retrieve a set of data from either prod or staging.
     """
-    api.puts('Retrieving the %s for %s' % (data_type, role))
-    if role == 'prod':
-        hosts = api.env.prod_hosts
-        base_path = api.env.base_prod_path
-    elif role == 'staging':
-        hosts = api.env.staging_hosts
-        base_path = api.env.base_staging_path
-    else:
+    # Basic sanity checks
+    if role not in ['prod', 'staging']:
         api.abort('Role must be either "prod" or "staging".')
     if data_type != 'Data.fs':
         api.abort('The only supported data_type is "Data.fs".')
+
+    api.puts('Retrieving the %s for %s' % (data_type, role))
+
+    hosts = api.env.get('%s_hosts' % role)
+    base_path = api.env.get('base_%s_path' % role)
     project_path = os.path.join(base_path,
                                 api.env.project_name)
     for host in hosts:
