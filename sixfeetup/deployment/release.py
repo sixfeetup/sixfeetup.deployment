@@ -37,7 +37,7 @@ def deploy(env='qa', diffs='on'):
         bump_package_versions()
         update_versions_cfg()
         tag_buildout()
-        release_qa()
+        release_to(env)
     else:
         eval("release_%s()" % env)
     _clear_previous_state()
@@ -321,36 +321,22 @@ def tag_buildout():
     api.local("svn ci -m 'bumping version for next release' version.txt")
 
 
-def release_qa():
-    print colors.blue("Releasing to QA")
-    api.env.deploy_env = 'qa'
-    for host in api.env.qa_hosts:
-        with api.settings(host_string=host):
-            _release_to_env()
-
-
-def release_staging():
-    print colors.blue("Releasing to staging")
-    api.env.deploy_env = 'staging'
-    for host in api.env.staging_hosts:
-        with api.settings(host_string=host):
-            _release_to_env()
-
-
-def release_prod():
-    print colors.blue("Releasing to prod")
-    do_release = contrib.console.confirm("Are you sure?", default=False)
-    if not do_release:
-        api.abort("You didn't want to release")
-    api.env.deploy_env = 'prod'
-    for host in api.env.prod_hosts:
+def release_to(target='qa'):
+    """Release to a particular environment: QA, staging, prod
+    """
+    print colors.blue("Releasing to: %s", target)
+    if target == 'prod':
+        do_release = contrib.console.confirm("Are you sure?", default=False)
+        if not do_release:
+            api.abort("You didn't want to release")
+    api.env.deploy_env = target
+    hosts = api.env.get('%s_hosts' % target)
+    for host in hosts:
         with api.settings(host_string=host):
             _release_to_env()
 
 
 def _release_to_env():
-    """Release to a particular environment
-    """
     base_env_path = "base_%s_path" % api.env.deploy_env
     base_path = api.env.get(base_env_path, "")
     if not base_path:

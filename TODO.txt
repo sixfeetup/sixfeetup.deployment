@@ -2,4 +2,3 @@
 - Add a lockfile when sending data from prod/staging to extranet
 - Use rsync to pull down data from extranet instead of the tarball
 - Update release process to prompt for refreshing data from extranet
-- Refactor release_* commands to be a single command accepting a parameter
