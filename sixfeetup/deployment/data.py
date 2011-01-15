@@ -149,4 +149,4 @@ def sync_data(role='prod', data_type='Data.fs'):
     for host in hosts:
         with api.settings(host_string=host):
             if data_type == 'Data.fs':
-                _retrieve_datafs(role, project_path)
+                _sync_datafs(role, project_path)
