@@ -1,3 +1,6 @@
+- Add state tracking for steps taken (svn tags, dist uploads)
+- Add error handling, so that you can revert any steps taken during the release
+
 - Change data syncing to subdirs (current_prod/filestorage|blobstorage|solr etc)
 - Add a lockfile when sending data from prod/staging to extranet
 - Use rsync to pull down data from extranet instead of the tarball
