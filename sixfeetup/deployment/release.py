@@ -2,10 +2,15 @@ import os
 import pickle
 import re
 import distutils.version
+import pkg_resources
+
 from fabric import colors
 from fabric import api
 from fabric import contrib
-import py.path
+
+from jarn.mkrelease.scm import SCMFactory
+from jarn.mkrelease.setuptools import Setuptools
+
 from sixfeetup.deployment.utils import GLOBAL_IGNORES
 from sixfeetup.deployment.utils import TRUISMS
 from sixfeetup.deployment.utils import YES_OR_NO
@@ -24,22 +29,34 @@ TAG_HELP_TEXT = """
 
 Current tags:
     %(current_tags_string)s
-Enter a tag name for %(package)s"""
+Enter a tag to release to %(target)s"""
+DEFAULT_HOSTS = {
+    'testing': ['sfupqaapp01'],
+    'staging': ['sfupstaging01'],
+}
+DEFAULT_PATHS = {
+    'testing': '/var/db/zope/dev',
+    'staging': '/var/db/zope',
+}
 
-
-def deploy(env='qa', diffs='on'):
+def deploy(env='testing', diffs='on'):
     """Start the deployment process for this project
     """
     _release_manager_warning()
-    if env == 'qa':
+    if env == 'testing':
+        api.env.scm_factory = SCMFactory()
+        api.env.setuptools = Setuptools()
         choose_packages(diffs, save_choices='yes')
         release_packages(save_choices='yes')
         bump_package_versions()
         update_versions_cfg()
         tag_buildout()
-        release_to(env)
+        #TODO: get automated release working
+        #release_to(env)
     else:
-        eval("release_%s()" % env)
+        #TODO: get automated release working
+        #eval("release_to(%s)" % env)
+        pass
     _clear_previous_state()
     _release_manager_warning()
 
@@ -60,40 +77,30 @@ Check the following URL before continuing:
 def list_package_candidates(verbose='yes'):
     """List the packages that are available for deployment"""
     ignore_dirs = api.env.ignore_dirs + GLOBAL_IGNORES
+    get_info = api.env.setuptools.get_package_info
     # find all the packages in the given package dirs
     for package_dir in api.env.package_dirs:
-        items = os.listdir(package_dir)
+        abs_package_dir = os.path.abspath(os.path.expanduser(package_dir))
+        items = os.listdir(abs_package_dir)
         for item in items:
             if item not in ignore_dirs:
-                package_path = '%s/%s' % (package_dir, item)
+                package_path = os.path.join(abs_package_dir, item)
                 if os.path.isdir(package_path):
-                    with api.cd(package_path):
-                        # get the actual package name from the setup.py
-                        package_name = api.local("python setup.py --name")
-                    if not package_name in api.env.package_info:
-                        api.env.package_info[package_name] = {}
+                    with api.lcd(package_path):
+                        # get the actual package name and version via mkrelease
+                        # TODO: handle dev release
+                        package_name, pkg_ver = get_info(package_path,
+                                                         develop=False)
+
+                    api.env.package_info.setdefault(package_name, {})
                     api.env.package_info[package_name]['path'] = package_path
+                    api.env.package_info[package_name]['version'] = pkg_ver
                     api.env.packages.append(package_name)
     if verbose.lower() in TRUISMS:
         print """
 Packages available:
 %s
 """ % "\n".join(api.env.packages)
-
-
-def _find_tags_url(wc):
-    """Find the wcpath/tags/ url so we can tag the package
-    """
-    url = wc.url.strip('/')
-    url_parts = url.split('/')
-    base_name = wc.svnurl().basename
-    if base_name != 'trunk':
-        # XXX this is a bit presumptuous
-        # remove the branches or tags
-        del url_parts[-2]
-    url_parts.remove(base_name)
-    base_url = '/'.join(url_parts)
-    return py.path.svnurl("%s/tags" % base_url)
 
 
 def _load_previous_state(save_choices):
@@ -126,21 +133,16 @@ def choose_packages(show_diff='yes', save_choices='no'):
     save_choices = save_choices.lower() in TRUISMS
     if _load_previous_state(save_choices):
         return
+
     list_package_candidates()
     for package in api.env.packages:
-        wc = py.path.svnwc(api.env.package_info[package]['path'])
-        wc_url = wc.url
+        package_info = api.env.package_info[package]
+        wc_path = package_info['path']
+        wc = api.env.scm_factory.get_scm_from_sandbox(wc_path)
+        wc_url = wc.get_url_from_sandbox(wc_path)
+
         if show_diff.lower() in TRUISMS:
-            tags_url = _find_tags_url(wc)
-            # XXX: kind of silly here...
-            current_tags = map(
-                lambda x: distutils.version.LooseVersion(x.basename),
-                tags_url.listdir())
-            current_tags.sort()
-            current_tags = map(str, current_tags)
-            current_tags_string = "No tags created yet"
-            if current_tags:
-                current_tags_string = "\n    ".join(current_tags)
+            current_tags, current_tags_string = _get_tags(wc_path)
             cmp_tag = None
             while True:
                 help_txt = DIFF_HELP_TEXT % locals()
@@ -148,11 +150,11 @@ def choose_packages(show_diff='yes', save_choices='no'):
                 if len(current_tags) > 0:
                     default_tag = current_tags[-1]
                 cmp_tag = api.prompt(help_txt, default=default_tag)
+                tagid = wc.make_tagid(wc_path, cmp_tag)
                 if cmp_tag.lower() in PASS_ME or cmp_tag in current_tags:
                     break
             if cmp_tag.lower() not in PASS_ME:
-                cmd = 'svn diff %(tags_url)s/%(cmp_tag)s %(wc_url)s |colordiff'
-                print api.local(cmd % locals())
+                print wc.diff_tag(wc_path, tagid)
         while True:
             release_package = api.prompt(
                 "Does '%s' need a release?" % package, default="no").lower()
@@ -162,6 +164,7 @@ def choose_packages(show_diff='yes', save_choices='no'):
             # make sure the question was answered properly
             if release_package in YES_OR_NO:
                 break
+
     if save_choices:
         with open('.saved_choices', 'w') as f:
             pickle.dump(api.env.package_info, f)
@@ -186,8 +189,7 @@ def release_packages(verbose="no", dev="no", save_choices='no'):
         # first check to see if this version of the package was already
         # released
         current_release = package_info.get('released_version', None)
-        with api.cd(package_info['path']):
-            current_version = api.local("python setup.py --version")
+        current_version = package_info['version']
         if current_release is not None and current_release == current_version:
             msg = "%s version %s has already been released"
             print colors.red(msg % (package, current_version))
@@ -202,21 +204,16 @@ def release_packages(verbose="no", dev="no", save_choices='no'):
         # TODO: alternate release targets (e.g. private)
         with api.settings(warn_only=True):
             output = api.local(
-                cmd % ("-C", package_target, package_path))
+                cmd % ("-Cp", package_target, package_path),
+                capture=True)
         if output.failed:
             print output
             api.abort(output.stderr)
-        # search through the mkrelease output to find the version number
-        tag_output = re.search('Tagging %s (.*)' % package, output)
-        if tag_output is not None and len(tag_output.groups()):
-            package_version = tag_output.groups()[0]
-        else:
-            print output
-            api.abort("Could not find package version from mkrelease output")
-        api.env.package_info[package]['version'] = package_version
+
+        api.env.package_info[package]['version'] = current_version
         api.env.package_info[package]['next_version'] = _next_minor_version(
-            package_version)
-        api.env.package_info[package]['released_version'] = package_version
+            current_version)
+        api.env.package_info[package]['released_version'] = current_version
         if save_choices:
             with open('.saved_choices', 'w') as f:
                 pickle.dump(api.env.package_info, f)
@@ -235,6 +232,7 @@ def bump_package_versions():
     print "\n".join(bumpers)
     for package in api.env.to_release:
         package_info = api.env.package_info[package]
+        wc = api.env.scm_factory.get_scm_from_sandbox(package_info['path'])
         next_version = package_info['next_version']
         version_location = package_info.get(
             'version_location',
@@ -251,9 +249,14 @@ def bump_package_versions():
                     vf_contents,
                     re.M)
                 f.write(vf_new)
-            cmd = "svn ci -m 'bumping version for next release' %s"
-            api.local(cmd % version_file)
+            wc.commit_sandbox(package_info['path'],
+                              package,
+                              next_version,
+                              True)
 
+def _get_buildout_version():
+    with open('version.txt') as f:
+        return f.read().strip()
 
 def update_versions_cfg():
     """Update the versions.cfg with the packages that have changed
@@ -292,70 +295,101 @@ def update_versions_cfg():
         with open(v_cfg, 'a') as f:
             for missing in missing_versions:
                 f.write("%s\n" % missing)
-    api.local("svn ci -m 'updating versions for release' %s" % v_cfg)
+    cwd = os.getcwd()
+    wc = api.env.scm_factory.get_scm_from_sandbox(cwd)
+    name = os.path.basename(cwd)
+    buildout_ver = _get_buildout_version()
+    wc.commit_sandbox(cwd, name, buildout_ver, True)
+
 
 
 def _get_buildout_url():
     """Get the base buildout url
     """
-    wc = py.path.svnwc('.')
-    trunk_url = wc.url
-    base_dir = wc.svnurl().dirpath().url
-    return trunk_url, base_dir
+    scm = SCMFactory()
+    wc = scm.get_scm_from_sandbox(os.getcwd())
+    sandbox_url = wc.get_url_from_sandbox(os.getcwd())
+    base_dir = wc.get_base_url_from_sandbox(os.getcwd())
+    return sandbox_url, base_dir
 
 
 def tag_buildout():
     if not api.env.to_release:
-        return
+        do_release = contrib.console.confirm(\
+                        "No packages selected; release only buildout?",
+                        default=False)
+        if not do_release:
+            api.abort("You didn't want to release")
     print colors.blue("Tagging buildout")
-    trunk_url, base_dir = _get_buildout_url()
-    with open('version.txt') as f:
-        version = f.read().strip()
-    api.local("svn cp -m 'tagging for release' %s %s/tags/%s" % (
-        trunk_url, base_dir, version))
+    cwd = os.getcwd()
+    wc = api.env.scm_factory.get_scm_from_sandbox(cwd)
+    version = _get_buildout_version()
+    tagid = wc.make_tagid(cwd, version)
+    name = os.path.basename(cwd)
+    wc.create_tag(cwd, tagid, name, version, True)
     # now bump the version and commit
     with open('version.txt', 'w') as f:
         new_version = _next_minor_version(version)
         f.write(new_version)
     api.env.deploy_tag = version
-    api.local("svn ci -m 'bumping version for next release' version.txt")
+    wc.commit_sandbox(cwd, name, new_version, True)
 
 
-def release_to(target='qa'):
-    """Release to a particular environment: QA, staging, prod
+def release_to(target='testing'):
+    """Release to a particular environment: testing, staging, prod
     """
-    print colors.blue("Releasing to: %s", target)
+    print colors.blue("Releasing to: %s" % target)
     if target == 'prod':
         do_release = contrib.console.confirm("Are you sure?", default=False)
         if not do_release:
             api.abort("You didn't want to release")
     api.env.deploy_env = target
-    hosts = api.env.get('%s_hosts' % target)
+    hosts = api.env.get('%s_hosts' % target,
+                        DEFAULT_HOSTS.get(target, []))
     for host in hosts:
         with api.settings(host_string=host):
             _release_to_env()
 
 
+def _get_tags(wc_path):
+    wc = api.env.scm_factory.get_scm_from_sandbox(wc_path)
+    with api.lcd(wc_path):
+        current_tags = sorted(wc.list_tags(wc_path),
+                              key=lambda x: pkg_resources.parse_version(x))
+    return (current_tags,
+            "\n    ".join(current_tags) or "No tags created yet")
+
+
 def _release_to_env():
     base_env_path = "base_%s_path" % api.env.deploy_env
-    base_path = api.env.get(base_env_path, "")
+    base_path = api.env.get(base_env_path,
+                            DEFAULT_PATHS.get(api.env.deploy_env))
     if not base_path:
         api.abort("Couldn't find %s" % base_env_path)
-    buildout_name = api.env.get("%s_buildout_name" % api.env.deploy_env, "")
+    buildout_name = api.env.get("%s_buildout_name" % api.env.deploy_env,
+                                api.env.project_name)
     if not buildout_name:
         api.abort("Buildout name not defined for %s" % api.env.deploy_env)
     # check for the buildout
     buildout_dir = "%s/%s" % (base_path, buildout_name)
     trunk_url, base_url = _get_buildout_url()
+
     if not api.env.deploy_tag:
-        # TODO: give the user a list of tags here
-        api.env.deploy_tag = api.prompt("What tag do you want to release?")
+        current_tags, current_tags_string = _get_tags(os.getcwd())
+        target = api.env.deploy_env
+        help_txt = TAG_HELP_TEXT % locals()
+        if len(current_tags) > 0:
+            default_tag = current_tags[-1]
+        api.env.deploy_tag = api.prompt(help_txt, default=default_tag)
+
     tag_url = "%s/tags/%s" % (base_url, api.env.deploy_tag)
     if not contrib.files.exists(buildout_dir):
         api.abort(
             "You need to create the initial api.env first: %s" % buildout_dir)
         # TODO: add to supervisor configs
         #with cd(base_path):
+             # NOTE: can't use jarn.mkrelease to abstract scm actions here,
+             #       unless it's installed on the remote machine
         #    api.run("svn co %s %s" % (tag_url, buildout_name))
         #    # TODO: make sure project is chowned and chmoded properly
         #with cd(buildout_dir):
@@ -371,14 +405,12 @@ def _release_to_env():
     api.run("supervisorctl stop %s" % supervisor_processes)
     # TODO: get the data from prod/staging here
     with api.cd(buildout_dir):
-        # XXX: Why did we have to do this? login shell borks things
-        api.env.shell = "/bin/bash -c"
         # TODO: Check for changes in the buildout
-        # TODO: Make this work as a particular user (namely zope)
         # switch to the new tag
-        api.run("svn switch %s" % tag_url)
+        api.sudo("svn switch %s" % tag_url, user='zope')
+        api.sudo("svn up", user='zope')
         # TODO: check for issues with switch
         # run buildout
-        api.run("bin/buildout -v")
+        api.sudo("bin/buildout -v", user='zope')
     # start instance
     api.run("supervisorctl start %s" % supervisor_processes)

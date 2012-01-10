@@ -24,8 +24,8 @@ api.env.package_dirs = ['src']
 api.env.ignore_dirs = []
 # extra information for a package
 api.env.package_info = {}
-# QA server host
-api.env.qa_hosts = ["sfupqaapp01"]
+# testing server host
+api.env.testing_hosts = ["sfupqaapp01"]
 api.env.staging_hosts = ["sfupstaging01"]
 api.env.prod_hosts = []
 # Data server host
@@ -34,16 +34,17 @@ api.env.data_hosts = ['extranet']
 api.env.base_data_path = '/usr/local/www/data'
 api.env.full_data_path = ''
 # Base path to instances
-api.env.base_qa_path = "/var/db/zope/dev"
+api.env.base_testing_path = "/var/db/zope/dev"
 api.env.base_staging_path = "/var/db/zope"
 api.env.base_prod_path = "/var/db/zope"
 # actual name of the buildout directory
-api.env.qa_buildout_name = ""
+api.env.testing_buildout_name = ""
 api.env.staging_buildout_name = ""
 api.env.prod_buildout_name = ""
 # supervisor process names
-api.env.qa_supervisor_processes = ""
+api.env.testing_supervisor_processes = ""
 api.env.staging_supervisor_processes = ""
 api.env.prod_supervisor_processes = ""
 # tag number
 api.env.deploy_tag = ""
+api.env.sudo_prefix = '%s%s ' % (api.env.sudo_prefix, '-H')
