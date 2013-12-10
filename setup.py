@@ -8,7 +8,8 @@ setup(name='sixfeetup.deployment',
       description="",
       long_description=open("README.txt").read() + "\n" +
                        open(os.path.join("docs", "HISTORY.txt")).read(),
-      # Get more strings from http://www.python.org/pypi?%3Aaction=list_classifiers
+      # Get more strings from
+      # http://www.python.org/pypi?%3Aaction=list_classifiers
       classifiers=[],
       keywords='',
       author='Six Feet Up, Inc.',
@@ -23,7 +24,8 @@ setup(name='sixfeetup.deployment',
           'setuptools',
           # -*- Extra requirements: -*-
           'fabric',
-          'jarn.mkrelease',
+          # mkrelease 3.8 makes things hang...
+          'jarn.mkrelease<=3.7',
       ],
       entry_points="""
       # -*- Entry points: -*-
