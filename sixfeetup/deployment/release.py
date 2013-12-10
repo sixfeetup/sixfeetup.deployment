@@ -1,7 +1,6 @@
 import os
 import pickle
 import re
-import distutils.version
 import pkg_resources
 
 from fabric import colors
@@ -38,6 +37,7 @@ DEFAULT_PATHS = {
     'testing': '/var/db/zope/dev',
     'staging': '/var/db/zope',
 }
+
 
 def deploy(env='testing', diffs='on'):
     """Start the deployment process for this project
@@ -83,19 +83,24 @@ def list_package_candidates(verbose='yes'):
         abs_package_dir = os.path.abspath(os.path.expanduser(package_dir))
         items = os.listdir(abs_package_dir)
         for item in items:
-            if item not in ignore_dirs:
-                package_path = os.path.join(abs_package_dir, item)
-                if os.path.isdir(package_path):
-                    with api.lcd(package_path):
-                        # get the actual package name and version via mkrelease
-                        # TODO: handle dev release
-                        package_name, pkg_ver = get_info(package_path,
-                                                         develop=False)
-
-                    api.env.package_info.setdefault(package_name, {})
-                    api.env.package_info[package_name]['path'] = package_path
-                    api.env.package_info[package_name]['version'] = pkg_ver
-                    api.env.packages.append(package_name)
+            if item in ignore_dirs:
+                continue
+            package_path = os.path.join(abs_package_dir, item)
+            if not os.path.isdir(package_path):
+                continue
+            with api.lcd(package_path):
+                # get the actual package name and version via mkrelease
+                # TODO: handle dev release
+                pkg_name, pkg_ver = get_info(package_path, develop=False)
+            safe_pkg_name = pkg_resources.safe_name(pkg_name)
+            if safe_pkg_name != pkg_name:
+                msg = "\nSafe package name for %s used: %s"
+                print colors.yellow(msg % (pkg_name, safe_pkg_name))
+            api.env.package_info.setdefault(safe_pkg_name, {})
+            api.env.package_info[safe_pkg_name]['path'] = package_path
+            api.env.package_info[safe_pkg_name]['version'] = pkg_ver
+            api.env.package_info[safe_pkg_name]['unsafe_name'] = pkg_name
+            api.env.packages.append(safe_pkg_name)
     if verbose.lower() in TRUISMS:
         print """
 Packages available:
@@ -139,7 +144,6 @@ def choose_packages(show_diff='yes', save_choices='no'):
         package_info = api.env.package_info[package]
         wc_path = package_info['path']
         wc = api.env.scm_factory.get_scm_from_sandbox(wc_path)
-        wc_url = wc.get_url_from_sandbox(wc_path)
 
         if show_diff.lower() in TRUISMS:
             current_tags, current_tags_string = _get_tags(wc_path)
