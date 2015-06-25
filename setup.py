@@ -25,7 +25,7 @@ setup(name='sixfeetup.deployment',
           # -*- Extra requirements: -*-
           'fabric',
           # mkrelease 3.8 makes things hang...
-          'jarn.mkrelease<=3.7',
+          'jarn.mkrelease>=3.8',
       ],
       entry_points="""
       # -*- Entry points: -*-
